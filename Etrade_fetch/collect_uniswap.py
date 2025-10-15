@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 import time
 
 # 替换成从The Graph Studio获取的、包含API Key的完整URL
-THE_GRAPH_API_URL = "https://gateway.thegraph.com/api/2e920f204fcf761228097f30700cd3a1/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV"
+THE_GRAPH_API_URL = "https://gateway.thegraph.com/api/YOURAPIKEY/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV"
 POOL_ADDRESS = "0x11b815efb8f581194ae79006d24e0d814b7697f6"
 
 # 数据库连接字符串

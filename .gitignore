@@ -1,0 +1,8 @@
+# mac
+.DS_Store
+
+# IDE
+.vs
+.idea
+.vscode
+.cursor

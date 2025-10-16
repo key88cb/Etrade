@@ -20,7 +20,3 @@ func (s *Service) GetOpportunities() ([]models.ArbitrageOpportunity, error) {
 	err := s.db.Find(&opportunities).Error
 	return opportunities, err
 }
-
-func (s *Service) Test() string {
-	return "hello"
-}

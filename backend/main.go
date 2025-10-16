@@ -11,7 +11,7 @@ func main() {
 	db.InitDB()
 
 	// 2. 设置并获取路由引擎
-	r := api.SetupRouter(db.GetDB())
+	r := api.SetupRouter()
 
 	// 3. 启动HTTP服务
 	r.Run(":8888")

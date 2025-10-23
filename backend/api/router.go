@@ -16,13 +16,14 @@ func SetupRouter() *gin.Engine {
 	r.Use(cors.New(config))
 
 	// 初始化handler
-	handler := NewHandler()
+	h := NewHandler()
 
 	// 定义API路由组
 	apiV1 := r.Group("/api/v1")
 	{
-		apiV1.GET("/opportunities", handler.GetOpportunities)
-		// 未来可以添加更多路由...
+		// 3. 将路由绑定到 Handler 的方法上
+		apiV1.GET("/opportunities", h.GetOpportunities)
+		apiV1.GET("/price-comparison", h.GetPriceComparisonData)
 	}
 
 	return r

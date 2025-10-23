@@ -29,6 +29,7 @@ func InitDB() error {
 		&models.ArbitrageOpportunity{},
 		&models.BinanceTrade{},
 		&models.UniswapSwap{},
+		&models.AggregatedPrice{},
 	)
 	if err != nil {
 		return err

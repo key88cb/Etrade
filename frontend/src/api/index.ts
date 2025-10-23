@@ -26,7 +26,13 @@ instance.interceptors.response.use(
 const api = {
   getOpportunities: () => {
     return instance.get('/opportunities');
-  }
+  },
+  /**
+   * 获取用于价格对比图表的数据
+   */
+  getPriceComparisonData: () => {
+    return instance.get('/price-comparison');
+  }
 }
 
 export default api;

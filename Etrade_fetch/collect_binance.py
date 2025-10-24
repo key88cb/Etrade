@@ -4,13 +4,16 @@ from sqlalchemy import create_engine
 import time
 import datetime
 import concurrent.futures
+import random
 
+# --- 修正后的配置 ---
 BINANCE_API_URL = "https://api.binance.com"
 SYMBOL = "ETHUSDT"
-MAX_WORKERS = 10
+MAX_WORKERS = 2  # <-- 降低并发数
 
 DB_CONNECTION_STRING = "postgresql://postgres:mysecretpassword@localhost:5432/etrade"
 
+# 【重要提醒】请使用真实的历史数据年份
 YEAR = 2025
 MONTH = 9
 DAY = 1
@@ -27,7 +30,8 @@ def fetch_chunk(symbol, start_time_ms, end_time_ms):
         try:
             response = requests.get(
                 f"{BINANCE_API_URL}/api/v3/aggTrades",
-                params={'symbol': symbol, 'startTime': current_start_time, 'endTime': end_time_ms, 'limit': 1000}
+                params={'symbol': symbol, 'startTime': current_start_time, 'endTime': end_time_ms, 'limit': 1000},
+                timeout=(5, 15)  # <-- 【新增】设置超时
             )
             response.raise_for_status()
             trades = response.json()
@@ -46,10 +50,11 @@ def fetch_chunk(symbol, start_time_ms, end_time_ms):
             current_start_time = last_trade_time + 1
         else:
             break
+
+        time.sleep(random.uniform(0.1, 0.3))
+
     print(f"[{thread_name}] 完成获取，共 {len(chunk_trades)} 条记录。")
     return chunk_trades
-
-
 def process_and_store_binance_data(trades_data, engine):
     if not trades_data:
         print("列表中没有任何数据可以保存。")

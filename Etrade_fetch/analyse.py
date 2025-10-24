@@ -8,9 +8,9 @@ UNISWAP_FEE_RATE = 0.0005 # Uniswap池费率
 ESTIMATED_GAS_USED = 20#0000 # Gas消耗量估算值
 
 # 策略参数
-INITIAL_INVESTMENT_USDT = 1000000.0 # 每次套利的初始投入资金
-TIME_DELAY_SECONDS = 6 # 非原子套利的执行延迟估算 (6秒)
-PROFIT_THRESHOLD_USDT = 0.1 # 只记录利润大于1 USDT的机会
+INITIAL_INVESTMENT_USDT = 10000.0 # 每次套利的初始投入资金
+TIME_DELAY_SECONDS = 3 # 非原子套利的执行延迟估算 (6秒)
+PROFIT_THRESHOLD_USDT = 10 # 只记录利润大于1 USDT的机会
 # --- 2. 数据库连接 ---
 # 请替换成你自己的数据库连接信息
 DB_CONNECTION_STRING = "postgresql://postgres:mysecretpassword@localhost:5432/etrade"
@@ -19,7 +19,6 @@ engine = create_engine(DB_CONNECTION_STRING)
 
 def load_data():
     print("正在从数据库加载数据...")
-    # 查询指定时间范围内的数据
     uniswap_df = pd.read_sql("SELECT * FROM uniswap_swaps", engine)
     binance_df = pd.read_sql("SELECT * FROM binance_trades", engine)
 
@@ -27,14 +26,23 @@ def load_data():
     uniswap_df['block_time'] = pd.to_datetime(uniswap_df['block_time'], utc=True)
     binance_df['trade_time'] = pd.to_datetime(binance_df['trade_time'], utc=True)
 
-    # 将时间戳设置为索引，提升按时间查找的效率
+    # 将时间戳设置为索引
     uniswap_df.set_index('block_time', inplace=True)
     binance_df.set_index('trade_time', inplace=True)
 
+    # 在使用 .loc 时间切片之前，必须确保索引已排序
+    print("正在排序索引 (这对于大型DataFrame可能需要一些时间)...")
+    uniswap_df.sort_index(inplace=True)
+    binance_df.sort_index(inplace=True)
+    print("索引排序完成。")
+
     print(f"加载完成: {len(uniswap_df)} 条Uniswap记录, {len(binance_df)} 条币安记录")
+    if not uniswap_df.empty:
+        print(f"Uniswap 数据时间范围: {uniswap_df.index.min()} -> {uniswap_df.index.max()}")
+    if not binance_df.empty:
+        print(f"Binance 数据时间范围: {binance_df.index.min()} -> {binance_df.index.max()}")
+
     return uniswap_df, binance_df
-
-
 
 def calculate_profit_buy_cex_sell_dex(investment, price_cex, price_dex, gas_price):
     eth_acquired = (investment * (1 - BINANCE_FEE_RATE)) / price_cex

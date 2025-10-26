@@ -5,13 +5,21 @@ import time
 import datetime
 import concurrent.futures
 import random
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- 修正后的配置 ---
-BINANCE_API_URL = "https://api.binance.com"
+BINANCE_API_URL = os.getenv("BINANCE_API_URL", "https://api.binance.com")
 SYMBOL = "ETHUSDT"
 MAX_WORKERS = 2  # <-- 降低并发数
 
-DB_CONNECTION_STRING = "postgresql://postgres:mysecretpassword@localhost:5432/etrade"
+DB_CONNECTION_STRING = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:postgres@localhost:5432/etrade"
+)
 
 # 【重要提醒】请使用真实的历史数据年份
 YEAR = 2025

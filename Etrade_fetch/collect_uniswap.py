@@ -2,13 +2,27 @@ import requests
 import pandas as pd
 from sqlalchemy import create_engine
 import time
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # 替换成从The Graph Studio获取的、包含API Key的完整URL
-THE_GRAPH_API_URL = "https://gateway.thegraph.com/api/YOURAPIKEY/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV"
-POOL_ADDRESS = "0x11b815efb8f581194ae79006d24e0d814b7697f6"
+THE_GRAPH_API_URL = os.getenv(
+    "THE_GRAPH_API_URL",
+    "https://gateway.thegraph.com/api/YOURAPIKEY/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV"
+)
+POOL_ADDRESS = os.getenv(
+    "UNISWAP_POOL_ADDRESS",
+    "0x11b815efb8f581194ae79006d24e0d814b7697f6"
+)
 
 # 数据库连接字符串
-DB_CONNECTION_STRING = "postgresql://postgres:mysecretpassword@localhost:5432/etrade"
+DB_CONNECTION_STRING = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:postgres@localhost:5432/etrade"
+)
 
 # 时间范围: 2025-09-01
 START_TIMESTAMP = 1756694400  # 2025-09-01 00:00:00 UTC

@@ -1,5 +1,10 @@
 import pandas as pd
 from sqlalchemy import create_engine
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- 1. 定义常量 (Constants) ---
 # 交易成本
@@ -13,7 +18,10 @@ TIME_DELAY_SECONDS = 3 # 非原子套利的执行延迟估算 (6秒)
 PROFIT_THRESHOLD_USDT = 10 # 只记录利润大于1 USDT的机会
 # --- 2. 数据库连接 ---
 # 请替换成你自己的数据库连接信息
-DB_CONNECTION_STRING = "postgresql://postgres:mysecretpassword@localhost:5432/etrade"
+DB_CONNECTION_STRING = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:postgres@localhost:5432/etrade"
+)
 engine = create_engine(DB_CONNECTION_STRING)
 
 

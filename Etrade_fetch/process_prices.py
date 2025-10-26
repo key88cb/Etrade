@@ -4,9 +4,17 @@ import time
 import datetime
 import calendar
 from tqdm import tqdm
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- 配置 --- 记得改密码
-DB_CONNECTION_STRING = "postgresql://postgres:mysecretpassword@localhost:5432/etrade"
+DB_CONNECTION_STRING = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:postgres@localhost:5432/etrade"
+)
 engine = create_engine(DB_CONNECTION_STRING)
 AGGREGATION_INTERVAL = 'minute'
 YEAR = 2025

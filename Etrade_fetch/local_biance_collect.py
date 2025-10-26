@@ -4,10 +4,18 @@ import time
 from tqdm import tqdm
 import math
 import sys
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- 1. 配置 (!!! 请务必修改为你自己的信息 !!!) ---
 CSV_FILE_PATH = r"D:\大三上\SRE软件需求工程\ETHUSDT-trades-2025-09\ETHUSDT-trades-2025-09.csv"
-DB_CONNECTION_STRING = "postgresql://postgres:mysecretpassword@localhost:5432/etrade"
+DB_CONNECTION_STRING = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:postgres@localhost:5432/etrade"
+)
 TABLE_NAME = "binance_trades"
 
 # 设置为 100 则导入整个文件。

@@ -3,24 +3,36 @@ package db
 import (
 	"fmt"
 	"log"
-	"os"
 
-	"backend/config"
 	"backend/models"
 
+	"github.com/spf13/viper"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 var db *gorm.DB
 
+type DBConfig struct {
+	Host     string
+	Port     string
+	Username string
+	Password string
+	Database string
+}
+
 // InitDB 初始化数据库连接
 func InitDB() error {
-	config.LoadEnv()
-
-	dsn := buildDSN()
-	var err error
-	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	// dsn (Data Source Name) 是你的数据库连接字符串
+	// 格式: "host=主机 user=用户名 password=密码 dbname=数据库名 port=端口 sslmode=disable TimeZone=Asia/Shanghai"
+	var config DBConfig
+	config.Host = viper.GetString("db.host")
+	config.Port = viper.GetString("db.port")
+	config.Username = viper.GetString("db.username")
+	config.Password = viper.GetString("db.password")
+	config.Database = viper.GetString("db.database")
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable", config.Host, config.Username, config.Password, config.Database, config.Port)
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return err
 	}
@@ -42,32 +54,4 @@ func InitDB() error {
 
 func GetDB() *gorm.DB {
 	return db
-}
-
-func buildDSN() string {
-	host := getEnv("DB_HOST", "localhost")
-	port := getEnv("DB_PORT", "5432")
-	user := getEnv("DB_USER", "postgres")
-	password := getEnv("DB_PASSWORD", "")
-	dbName := getEnv("DB_NAME", "etrade")
-	sslMode := getEnv("DB_SSLMODE", "disable")
-	timezone := getEnv("DB_TIMEZONE", "Asia/Shanghai")
-
-	return fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
-		host,
-		user,
-		password,
-		dbName,
-		port,
-		sslMode,
-		timezone,
-	)
-}
-
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
 }

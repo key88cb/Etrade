@@ -113,7 +113,7 @@ npm run dev # 运行项目
 - postgresql: 存储套利机会 交易记录
 - go(gin): 请求处理
 - python: 数据获取与分析
-- vue: 看板，组件库 ant-design-vue 可视化库 echarts
+- vue: 看板，组件库 ant-design-vue 可视化库 echarts UI组件库 AntD
 
 ### IDE 推荐
 

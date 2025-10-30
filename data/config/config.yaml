@@ -6,6 +6,6 @@ db:
   password: 123456
 
 the_graph:
-  api_key: 
+  api_key: 9f9faba5da813868926b3337fb728af5
   graph_api_url: https://gateway.thegraph.com/api/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV
   uniswap_pool_address: 0x11b815efb8f581194ae79006d24e0d814b7697f6

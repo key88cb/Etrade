@@ -4,18 +4,21 @@
 
 ### postgresql
 
-开发环境可以使用docker拉取，这样比较快捷
+开发环境可以使用docker拉取，这样便于调整端口等配置
 
 ```bash
 # 拉取 PostgreSQL
 docker pull postgres
 # 一并拉取 pgadmin4 方便查询
 docker pull dpage/pgadmin4
+# 因为本项目的数据较多，所以最好创建一个数据卷
+docker volume inspect postgre-data
 # 运行，配置尽量不要改
-docker run -d -p 5432:5432 \
-  -e POSTGRES_PASSWORD=TsSzEpejXAjuCztYQRG3 \
-  --name postgresql \
-  postgres
+docker run --name postgresql \
+  -e POSTGRES_PASSWORD=123456 \
+  -p 5432:5432 \
+  -v postgre-data:/var/lib/postgresql/data \
+  -d postgres
 
 docker run -d -p 5433:80 
   --name pgadmin4 
@@ -24,18 +27,23 @@ docker run -d -p 5433:80
   dpage/pgadmin4
 ```
 
-- 这里 postgre sql 运行的端口用默认的 5432 端口，然后默认用户名为postgres，密码就是输入的123456，这个账号和密码用于访问数据库本身。
+- 这里 postgre sql 运行的端口用默认的 5432 端口（请确保这个端口可用，换着换到别的可用端口），默认用户名为postgres，密码就是123456，这个账号和密码用于访问数据库本身。
 - 而下面的邮箱test@123.com和密码是用于访问 pgadmin ，但注意 pgadmin 中输入服务器地址时需要输host.docker.internal，而不是localhost或者127.0.0.1
+- 快速删除数据可以使用`psql`命令行工具（如果你是用的docker拉取postgresql，那么你本地是没有psql的，就算真的要执行`psql`指令也得去docker容器内部），删除命令为 `dropdb -h localhost -p 5432 -U postgres etrade`，创建数据库同理
 
 gorm使用有一些细节：
 
 - postgre sql数组在go中对应什么类型，数组的类型可不是`[]int`（这个显然是切片），应该用`github.com/lib/pq`中的扩展类型<del>或者自己去实现</del>
-- 字符串会默认存储为Text，Text（任意长字符串）其实一般也没问题，不过从设计角度可能`Varchar`要更好点，可以避免塞进去一些过于奇怪的东西，当然这是很极端的情况
+- 字符串会默认存储为Text，Text（任意长字符串）其实一般也没问题，不过从设计角度可能`Varchar`要更好点，可以避免塞进去一些过于奇怪的东西
 
 ### 环境配置
 
-1. 复制根目录下的 `.env.example` 为 `.env`，并填入真实的数据库账号、密码等敏感信息（`.env` 已被加入 `.gitignore`，不会提交到仓库）。
-2. 所有 Go/Python 服务都会在启动时自动读取 `.env`，也可以在 IDE 的运行配置中直接注入相同的环境变量。
+### Python
+
+复制根目录下的 `.env_example` 为 `.env`，并填入真实的数据库账号、密码等敏感信息（`.env` 已被加入 `.gitignore`，不会提交到仓库）。
+
+所有 Python 服务都会在启动时自动读取 `.env`，也可以在 IDE 的运行配置中直接注入相同的环境变量。
+
 
 ### 后端
 

@@ -9,13 +9,13 @@ import yaml
 from loguru import logger
 from tqdm import tqdm
 
-with open('config/config.yaml', 'r', encoding='utf-8') as file:
+with open("config/config.yaml", "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)
-    HOST = config['db']['host']
-    PORT = config['db']['port']
-    DATABASE = config['db']['database']
-    USERNAME = config['db']['username']
-    PASSWORD = config['db']['password']
+    HOST = config["db"]["host"]
+    PORT = config["db"]["port"]
+    DATABASE = config["db"]["database"]
+    USERNAME = config["db"]["username"]
+    PASSWORD = config["db"]["password"]
     # 使用 psycopg2 连接数据库
 conn = psycopg2.connect(
     host=HOST,
@@ -26,7 +26,7 @@ conn = psycopg2.connect(
 )
 conn.autocommit = False
 cur = conn.cursor()
-AGGREGATION_INTERVAL = 'minute'
+AGGREGATION_INTERVAL = "minute"
 YEAR = 2025
 MONTH = 9
 
@@ -65,13 +65,19 @@ UNION ALL
 
 num_days = calendar.monthrange(YEAR, MONTH)[1]
 all_days_dfs = []
-logger.info(f"正在聚合 {YEAR}-{MONTH} (共 {num_days} 天) 的数据，按 '{AGGREGATION_INTERVAL}' 粒度...")
+logger.info(
+    f"正在聚合 {YEAR}-{MONTH} (共 {num_days} 天) 的数据，按 '{AGGREGATION_INTERVAL}' 粒度..."
+)
 
 # 4. 使用 tqdm 包裹循环 (保持不变)
 for day in tqdm(range(1, num_days + 1), desc="聚合每日数据"):
 
-    day_start = datetime.datetime(YEAR, MONTH, day, 0, 0, 0, tzinfo=datetime.timezone.utc)
-    day_end = datetime.datetime(YEAR, MONTH, day, 23, 59, 59, tzinfo=datetime.timezone.utc)
+    day_start = datetime.datetime(
+        YEAR, MONTH, day, 0, 0, 0, tzinfo=datetime.timezone.utc
+    )
+    day_end = datetime.datetime(
+        YEAR, MONTH, day, 23, 59, 59, tzinfo=datetime.timezone.utc
+    )
 
     try:
         params = (
@@ -85,7 +91,9 @@ for day in tqdm(range(1, num_days + 1), desc="聚合每日数据"):
         cur.execute(sql_template, params)
         rows = cur.fetchall()
         if rows:
-            day_df = pd.DataFrame(rows, columns=["time_bucket", "source", "average_price"])
+            day_df = pd.DataFrame(
+                rows, columns=["time_bucket", "source", "average_price"]
+            )
             all_days_dfs.append(day_df)
 
     except Exception as e:

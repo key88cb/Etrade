@@ -14,35 +14,36 @@ from tqdm import tqdm
 CSV_FILE_PATH = r"./ETHUSDT-trades-2025-09.csv"
 
 # 从配置文件加载数据库配置
-with open('config/config.yaml', 'r', encoding='utf-8') as file:
+with open("config/config.yaml", "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)
 
-HOST = config['db']['host']
-PORT = config['db']['port']
-DATABASE = config['db']['database']
-USERNAME = config['db']['username']
-PASSWORD = config['db']['password']
+HOST = config["db"]["host"]
+PORT = config["db"]["port"]
+DATABASE = config["db"]["database"]
+USERNAME = config["db"]["username"]
+PASSWORD = config["db"]["password"]
 
 # 导入比例
 IMPORT_PERCENTAGE = 1  # 整个6G的文件一共有1亿行
 CHUNK_SIZE = 1_000_000
-COLUMN_NAMES = ['id', 'price', 'qty', 'quoteQty', 'time', 'isBuyerMaker', 'isBestMatch']
+COLUMN_NAMES = ["id", "price", "qty", "quoteQty", "time", "isBuyerMaker", "isBestMatch"]
 
 # 为加速 pandas 解析，显式声明 dtype，避免类型推断
 DTYPE_MAP = {
-    'id': 'int64',
-    'price': 'float64',
-    'qty': 'float64',
-    'quoteQty': 'float64',
-    'time': 'int64',
-    'isBuyerMaker': 'bool',
-    'isBestMatch': 'bool',
+    "id": "int64",
+    "price": "float64",
+    "qty": "float64",
+    "quoteQty": "float64",
+    "time": "int64",
+    "isBuyerMaker": "bool",
+    "isBestMatch": "bool",
 }
 
 # 检查导入百分比
 if not 0 <= IMPORT_PERCENTAGE <= 100:
     logger.error("IMPORT_PERCENTAGE 必须在 0 到 100 之间。")
     sys.exit()
+
 
 def count_lines(filepath):
     """
@@ -54,9 +55,11 @@ def count_lines(filepath):
         logger.info("正在估算文件总行数")
         start_time = time.time()
         # 使用快速方式计数
-        count = sum(1 for line in open(filepath, 'rb'))
+        count = sum(1 for line in open(filepath, "rb"))
         end_time = time.time()
-        logger.info(f"估算完成，共约 {count} 行数据，耗时 {end_time - start_time:.2f} 秒。")
+        logger.info(
+            f"估算完成，共约 {count} 行数据，耗时 {end_time - start_time:.2f} 秒。"
+        )
         return count
     except FileNotFoundError:
         logger.error(f"找不到CSV文件 '{filepath}'。请检查路径是否正确。")
@@ -65,8 +68,17 @@ def count_lines(filepath):
         logger.warning(f"估算行数失败: {e}. 无法按百分比导入。")
         return None
 
-def process_chunk(chunk_data, chunk_index, conn, table_name, pbar,
-                  rows_counter, target_rows, pbar_unit):
+
+def process_chunk(
+    chunk_data,
+    chunk_index,
+    conn,
+    table_name,
+    pbar,
+    rows_counter,
+    target_rows,
+    pbar_unit,
+):
     """
     描述：处理单个分块：预处理数据并写入数据库
     参数：chunk_data: 分块数据, chunk_index: 分块索引, db_connection_string: 数据库连接字符串,
@@ -76,17 +88,23 @@ def process_chunk(chunk_data, chunk_index, conn, table_name, pbar,
     original_chunk_len = len(chunk_data)
     # 数据预处理
     chunk = chunk_data.copy()
-    chunk.rename(columns={
-        'time': 'trade_time', 'quoteQty': 'quote_qty',
-        'isBuyerMaker': 'is_buyer_maker', 'isBestMatch': 'is_best_match'
-
-    }, inplace=True)
+    chunk.rename(
+        columns={
+            "time": "trade_time",
+            "quoteQty": "quote_qty",
+            "isBuyerMaker": "is_buyer_maker",
+            "isBestMatch": "is_best_match",
+        },
+        inplace=True,
+    )
     # 将微秒时间戳转换为 UTC datetime
-    chunk['trade_time'] = pd.to_datetime(chunk['trade_time'], unit='us', utc=True, errors='coerce')
-    chunk.dropna(subset=['trade_time'], inplace=True)
+    chunk["trade_time"] = pd.to_datetime(
+        chunk["trade_time"], unit="us", utc=True, errors="coerce"
+    )
+    chunk.dropna(subset=["trade_time"], inplace=True)
     if chunk.empty:
         rows_counter[0] += original_chunk_len
-        pbar.update(original_chunk_len if pbar_unit == '行' else 1)
+        pbar.update(original_chunk_len if pbar_unit == "行" else 1)
         should_stop = target_rows is not None and rows_counter[0] >= target_rows
         return (True, original_chunk_len, 0, should_stop)
     try:
@@ -95,9 +113,7 @@ def process_chunk(chunk_data, chunk_index, conn, table_name, pbar,
         # 以 CSV 无表头导出，Postgres COPY CSV 可识别 True/False 和 ISO8601 时间
         chunk.to_csv(csv_buffer, index=False, header=False)
         csv_buffer.seek(0)
-        columns = (
-            'id, price, qty, quote_qty, trade_time, is_buyer_maker, is_best_match'
-        )
+        columns = "id, price, qty, quote_qty, trade_time, is_buyer_maker, is_best_match"
         copy_sql = f"COPY {table_name} ({columns}) FROM STDIN WITH (FORMAT CSV)"
 
         with conn.cursor() as cursor:
@@ -107,7 +123,7 @@ def process_chunk(chunk_data, chunk_index, conn, table_name, pbar,
         rows_imported = len(chunk)
         rows_counter[0] += original_chunk_len
         rows_counter[1] += rows_imported
-        pbar.update(original_chunk_len if pbar_unit == '行' else 1)
+        pbar.update(original_chunk_len if pbar_unit == "行" else 1)
         should_stop = target_rows is not None and rows_counter[0] >= target_rows
         return (True, original_chunk_len, rows_imported, should_stop)
 
@@ -115,9 +131,10 @@ def process_chunk(chunk_data, chunk_index, conn, table_name, pbar,
         logger.error(f"写入数据库块 {chunk_index + 1} 时失败: {db_err}")
         conn.rollback()
         rows_counter[0] += original_chunk_len
-        pbar.update(original_chunk_len if pbar_unit == '行' else 1)
+        pbar.update(original_chunk_len if pbar_unit == "行" else 1)
         should_stop = target_rows is not None and rows_counter[0] >= target_rows
         return (False, original_chunk_len, 0, should_stop)
+
 
 def import_data_to_database(conn, target_rows, total_lines):
     """
@@ -126,8 +143,12 @@ def import_data_to_database(conn, target_rows, total_lines):
     返回：[processed_rows_count, rows_imported_successfully]
     """
     # 准备 tqdm 进度条
-    pbar_total = target_rows if target_rows is not None and IMPORT_PERCENTAGE < 100 else total_lines
-    pbar_unit = '行' if pbar_total is not None else '块'
+    pbar_total = (
+        target_rows
+        if target_rows is not None and IMPORT_PERCENTAGE < 100
+        else total_lines
+    )
+    pbar_unit = "行" if pbar_total is not None else "块"
     pbar = tqdm(total=pbar_total, unit=pbar_unit, desc="导入进度")
     # 计数器：[processed_rows_count, rows_imported_successfully]
     rows_counter = [0, 0]
@@ -145,15 +166,24 @@ def import_data_to_database(conn, target_rows, total_lines):
             engine="c",
             low_memory=False,
             memory_map=True,
-            on_bad_lines='skip'
+            on_bad_lines="skip",
         )
         should_stop = False
         for i, chunk in enumerate(chunk_iterator):
             success, rows_processed, rows_imported, stop_flag = process_chunk(
-                chunk, i, conn, "binance_trades", pbar, rows_counter, target_rows, pbar_unit
+                chunk,
+                i,
+                conn,
+                "binance_trades",
+                pbar,
+                rows_counter,
+                target_rows,
+                pbar_unit,
             )
             if stop_flag and not should_stop:
-                logger.info(f"已处理约 {rows_counter[0]} 行，达到目标 {target_rows} 行。")
+                logger.info(
+                    f"已处理约 {rows_counter[0]} 行，达到目标 {target_rows} 行。"
+                )
                 should_stop = True
                 break
     except FileNotFoundError:
@@ -167,7 +197,8 @@ def import_data_to_database(conn, target_rows, total_lines):
         pbar.close()
     return rows_counter
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # 估算行数并计算目标行数
     total_lines = None
     if IMPORT_PERCENTAGE < 100:
@@ -179,7 +210,9 @@ if __name__ == '__main__':
     target_rows = None
     if total_lines is not None and IMPORT_PERCENTAGE < 100:
         target_rows = math.ceil(total_lines * (IMPORT_PERCENTAGE / 100))
-        logger.info(f"根据设置，将导入文件的前 {IMPORT_PERCENTAGE}%，约 {target_rows} 行数据。")
+        logger.info(
+            f"根据设置，将导入文件的前 {IMPORT_PERCENTAGE}%，约 {target_rows} 行数据。"
+        )
     elif total_lines is not None or IMPORT_PERCENTAGE == 100:
         target_rows = total_lines  # 导入全部
         logger.info("将导入整个文件。")

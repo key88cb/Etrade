@@ -2,5 +2,5 @@ db:
   host: localhost
   port: 5432
   username: postgres
-  password: 123456 # 替换成你自己的密码
+  password: 123456
   database: etrade

@@ -9,5 +9,5 @@ type UniswapSwap struct {
 	AmountETH  float64   `gorm:"not null"`
 	AmountUSDT float64   `gorm:"not null"`
 	GasPrice   int64     `gorm:"not null"`
-	TxHash     string    `gorm:"unique;not null"`
+	TxHash     string    `gorm:"not null"`
 }

@@ -1,0 +1,11 @@
+db:
+  host: localhost
+  port: 5432
+  database: etrade
+  username: postgres
+  password: 123456
+
+the_graph:
+  api_key: 
+  graph_api_url: https://gateway.thegraph.com/api/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV
+  uniswap_pool_address: 0x11b815efb8f581194ae79006d24e0d814b7697f6

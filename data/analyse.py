@@ -1,7 +1,7 @@
 import pandas as pd
+import psycopg2
 import yaml
 from loguru import logger
-import psycopg2
 from psycopg2.extras import execute_values
 
 # 1. 定义常量

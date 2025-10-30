@@ -4,9 +4,9 @@ import time
 
 import pandas as pd
 import psycopg2
-from psycopg2.extras import execute_values
 import yaml
 from loguru import logger
+from psycopg2.extras import execute_values
 from tqdm import tqdm
 
 with open("config/config.yaml", "r", encoding="utf-8") as file:

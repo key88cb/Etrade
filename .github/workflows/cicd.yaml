@@ -1,0 +1,98 @@
+name: Etrade CICD
+
+on:
+  push:
+    branches: [ master, develop ]
+  pull_request:
+    branches: [ master, develop ]
+
+jobs:
+  backend-ci:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+    
+    #- name: Install and configure PostgreSQL
+    #  run: |
+    #    docker pull postgres
+    #    docker run -d \
+    #    --name postgresql \
+    #    -p 5432:5432 \
+    #    -e POSTGRES_PASSWORD="123456" \
+    #    postgres
+    #    docker ps
+
+    - name: Download Go dependencies
+      working-directory: ./backend
+      run: |
+        echo "Downloading Go dependencies..."
+        go mod download
+        echo "Dependencies downloaded successfully!"
+
+    - name: Verify dependencies
+      working-directory: ./backend
+      run: |
+        echo "Verifying dependencies..."
+        go mod verify
+        echo "Tidying go.mod..."
+        go mod tidy
+  
+    - name: Build
+      working-directory: ./backend
+      run: go build -o main main.go
+      
+    - name: Format Check
+      working-directory: ./backend
+      run: |
+        gofmt -l . | grep -e ".go" && exit 1 || exit 0
+        go install golang.org/x/tools/cmd/goimports@latest
+        goimports -l . | grep -e ".go" && exit 1 || exit 0
+
+  frontend-ci:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: ./frontend/package-lock.json
+
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Build frontend
+      working-directory: ./frontend
+      run: npm run build
+
+  data-lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+        cache-dependency-path: ./data/requirements.txt
+
+    - name: Install linters
+      run: |
+        python -m pip install --upgrade pip
+        pip install black isort
+
+    - name: Black check (data)
+      working-directory: ./data
+      run: black --check .
+
+    - name: isort check (data)
+      working-directory: ./data
+      run: isort --check-only .

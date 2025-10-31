@@ -34,16 +34,12 @@ docker run -d -p 5433:80
 gorm使用有一些细节：
 
 - postgre sql数组在go中对应什么类型，数组的类型可不是`[]int`（这个显然是切片），应该用`github.com/lib/pq`中的扩展类型<del>或者自己去实现</del>
-- 字符串会默认存储为Text，Text（任意长字符串）其实一般也没问题，不过从设计角度可能`Varchar`要更好点，可以避免塞进去一些过于奇怪的东西
+- 字符串会默认存储为Text，Text（任意长字符串）其实一般也没问题，不过从设计角度可能`Varchar`要更好点，可以避免塞进去一些过于奇怪的东西，当然这是很极端的情况
 
 ### 环境配置
 
-### Python
-
-复制根目录下的 `.env_example` 为 `.env`，并填入真实的数据库账号、密码等敏感信息（`.env` 已被加入 `.gitignore`，不会提交到仓库）。
-
-所有 Python 服务都会在启动时自动读取 `.env`，也可以在 IDE 的运行配置中直接注入相同的环境变量。
-
+1. 复制根目录下的 `.env.example` 为 `.env`，并填入真实的数据库账号、密码等敏感信息（`.env` 已被加入 `.gitignore`，不会提交到仓库）。
+2. 所有 Go/Python 服务都会在启动时自动读取 `.env`，也可以在 IDE 的运行配置中直接注入相同的环境变量。
 
 ### 后端
 
@@ -121,7 +117,7 @@ npm run dev # 运行项目
 - postgresql: 存储套利机会 交易记录
 - go(gin): 请求处理
 - python: 数据获取与分析
-- vue: 看板，组件库 ant-design-vue 可视化库 echarts
+- vue: 看板，组件库 ant-design-vue 可视化库 echarts UI组件库 AntD
 
 ### IDE 推荐
 

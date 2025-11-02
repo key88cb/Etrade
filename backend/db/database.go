@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-var db *gorm.DB
+var database *gorm.DB
 
 type DBConfig struct {
 	Host     string
@@ -32,7 +32,8 @@ func InitDB() error {
 	config.Password = viper.GetString("db.password")
 	config.Database = viper.GetString("db.database")
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable", config.Host, config.Username, config.Password, config.Database, config.Port)
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	var err error
+	database, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return err
 	}
@@ -40,7 +41,7 @@ func InitDB() error {
 	log.Println("Database connection established")
 
 	// 自动迁移数据库表
-	err = db.AutoMigrate(
+	err = database.AutoMigrate(
 		&models.ArbitrageOpportunity{},
 		&models.BinanceTrade{},
 		&models.UniswapSwap{},
@@ -53,5 +54,5 @@ func InitDB() error {
 }
 
 func GetDB() *gorm.DB {
-	return db
+	return database
 }

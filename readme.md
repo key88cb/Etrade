@@ -14,10 +14,11 @@ docker pull dpage/pgadmin4
 # 因为本项目的数据较多，所以最好创建一个数据卷
 docker volume inspect postgre-data
 # 运行，配置尽量不要改
+# 新版要求直接挂载/var/lib/postgresql而非/var/lib/postgresql
 docker run --name postgresql \
   -e POSTGRES_PASSWORD=123456 \
   -p 5432:5432 \
-  -v postgre-data:/var/lib/postgresql/data \
+  -v postgre-data:/var/lib/postgresql \ 
   -d postgres
 
 docker run -d -p 5433:80 

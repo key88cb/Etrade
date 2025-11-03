@@ -9,3 +9,8 @@ the_graph:
   api_key: 9f9faba5da813868926b3337fb728af5
   graph_api_url: https://gateway.thegraph.com/api/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV
   uniswap_pool_address: 0x11b815efb8f581194ae79006d24e0d814b7697f6
+
+etherscan:
+  etherscan_api_key: 92ZZFCVA1CTIJ24AZASQ5YBNWBWRPS53TQ
+  etherscan_api_url: https://api.etherscan.io/v2/api
+  uniswap_pool_address: "0x11b815efb8f581194ae79006d24e0d814b7697f6"

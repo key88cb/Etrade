@@ -1,4 +1,3 @@
-import threading
 import time
 from datetime import datetime, timezone
 
@@ -158,7 +157,7 @@ if __name__ == "__main__":
         port=PORT,
     )
     # 输入时间范围 2025-9-x ~ 2025-9-y
-    for i in range(2, 3):
+    for i in range(1, 31):
         logger.info(f"目前处理到 2025-9-{i}")
         start_time = datetime(2025, 9, i, 0, 0, 0, tzinfo=timezone.utc)
         end_time = datetime(2025, 9, i, 23, 59, 59, tzinfo=timezone.utc)

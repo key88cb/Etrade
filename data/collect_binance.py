@@ -25,7 +25,7 @@ PASSWORD = config["db"]["password"]
 
 # 导入比例
 IMPORT_PERCENTAGE = 1  # 整个6G的文件一共有1亿行
-CHUNK_SIZE = 1_000_000
+CHUNK_SIZE = 10_000_000
 COLUMN_NAMES = ["id", "price", "qty", "quoteQty", "time", "isBuyerMaker", "isBestMatch"]
 
 # 为加速 pandas 解析，显式声明 dtype，避免类型推断

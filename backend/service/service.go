@@ -3,6 +3,8 @@ package service
 import (
 	"backend/db"
 	"backend/models"
+	"fmt"  // 导入 fmt
+	"time" // 导入 time
 
 	"gorm.io/gorm"
 )
@@ -15,16 +17,48 @@ func NewService() *Service {
 	return &Service{db: db.GetDB()}
 }
 
-func (s *Service) GetOpportunities() ([]models.ArbitrageOpportunity, error) {
+// 添加了分页和排序参数
+func (s *Service) GetOpportunities(page, limit int, sortBy, order string) ([]models.ArbitrageOpportunity, *models.PaginationData, error) {
 	var opportunities []models.ArbitrageOpportunity
-	err := s.db.Find(&opportunities).Error
-	return opportunities, err
+	var paginationData *models.PaginationData
+
+	// 计算分页
+	offset := (page - 1) * limit
+
+	// 计算总数
+	var total int64
+	if err := s.db.Model(&models.ArbitrageOpportunity{}).Count(&total).Error; err != nil {
+		return nil, nil, err
+	}
+
+	paginationData = &models.PaginationData{
+		Total: total,
+		Page:  page,
+		Limit: limit,
+	}
+
+	// 构建排序
+	orderBy := fmt.Sprintf("%s %s", sortBy, order)
+
+	// 执行带分页和排序的查询
+	err := s.db.Order(orderBy).Offset(offset).Limit(limit).Find(&opportunities).Error
+
+	return opportunities, paginationData, err
 }
-func (s *Service) GetPriceComparisonData() (map[string][][2]interface{}, error) {
+
+// 添加了 startTime 和 endTime 参数
+func (s *Service) GetPriceComparisonData(startTime, endTime int64) (map[string][][2]interface{}, error) {
 	var results []models.AggregatedPrice
 
-	// 1. 从 service 层访问数据库
-	if err := s.db.Order("time_bucket asc").Find(&results).Error; err != nil {
+	// 将毫秒时间戳转换为 time.Time
+	start := time.UnixMilli(startTime)
+	end := time.UnixMilli(endTime)
+
+	// 1. 从 service 层访问数据库, 添加 WHERE 条件
+	if err := s.db.
+		Where("time_bucket BETWEEN ? AND ?", start, end).
+		Order("time_bucket asc").
+		Find(&results).Error; err != nil {
 		// 向上传递错误
 		return nil, err
 	}

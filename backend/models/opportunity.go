@@ -9,3 +9,10 @@ type ArbitrageOpportunity struct {
 	SellPrice    float64 `json:"sell_price" gorm:"not null"`
 	ProfitUSDT   float64 `json:"profit_usdt" gorm:"not null"`
 }
+
+// PaginationData 定义了分页响应的结构
+type PaginationData struct {
+	Total int64 `json:"total" example:"150"`
+	Page  int   `json:"page" example:"1"`
+	Limit int   `json:"limit" example:"10"`
+}

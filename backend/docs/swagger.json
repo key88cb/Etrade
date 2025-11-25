@@ -1,0 +1,254 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "contact": {}
+    },
+    "paths": {
+        "/opportunities": {
+            "get": {
+                "description": "(SRS FR-5.3) 获取套利机会列表，支持分页和排序",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Opportunities"
+                ],
+                "summary": "获取套利机会列表 (UC-02)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "example": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "example": 10,
+                        "description": "每页数量",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "profit_usdt",
+                        "example": "profit_usdt",
+                        "description": "排序字段 (snake_case)",
+                        "name": "sort_by",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "asc",
+                            "desc"
+                        ],
+                        "type": "string",
+                        "default": "desc",
+                        "example": "desc",
+                        "description": "排序顺序 (asc/desc)",
+                        "name": "order",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应 (符合 API 规范 3.1.B)",
+                        "schema": {
+                            "$ref": "#/definitions/api.SuccessOpportunitiesResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "参数错误 (Code: 40001, 40002)",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "服务器内部错误 (Code: 50001)",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/price-comparison": {
+            "get": {
+                "description": "(SRS FR-5.2) 获取用于 ECharts 渲染的聚合价格数据",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Visualization"
+                ],
+                "summary": "获取价格对比数据 (UC-01)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "example": 1756694400000,
+                        "description": "开始时间 (13位毫秒时间戳)",
+                        "name": "startTime",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "example": 1756780799000,
+                        "description": "结束时间 (13位毫秒时间戳)",
+                        "name": "endTime",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "成功响应 (符合 API 规范 3.1.A)",
+                        "schema": {
+                            "$ref": "#/definitions/api.SuccessPriceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "参数错误 (Code: 40001)",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "服务器内部错误 (Code: 50001)",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "api.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 40001
+                },
+                "message": {
+                    "type": "string",
+                    "example": "请求参数无效"
+                }
+            }
+        },
+        "api.OpportunitiesResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ArbitrageOpportunity"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/api.PaginationData"
+                }
+            }
+        },
+        "api.PaginationData": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 150
+                }
+            }
+        },
+        "api.PriceComparisonResponse": {
+            "type": "object",
+            "properties": {
+                "binance": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {}
+                    }
+                },
+                "uniswap": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {}
+                    }
+                }
+            }
+        },
+        "api.SuccessOpportunitiesResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/api.OpportunitiesResponse"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "success"
+                }
+            }
+        },
+        "api.SuccessPriceResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "$ref": "#/definitions/api.PriceComparisonResponse"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "success"
+                }
+            }
+        },
+        "models.ArbitrageOpportunity": {
+            "type": "object",
+            "properties": {
+                "buy_platform": {
+                    "type": "string"
+                },
+                "buy_price": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "profit_usdt": {
+                    "type": "number"
+                },
+                "sell_platform": {
+                    "type": "string"
+                },
+                "sell_price": {
+                    "type": "number"
+                }
+            }
+        }
+    }
+}

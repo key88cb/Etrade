@@ -1,152 +1,159 @@
-<template>
-  <div class="home-container">
-    <a-card class="welcome-card" :bordered="false">
-      <div class="logo-section">
-        <img src="/logo.png" alt="Etrade Logo" class="logo-image" />
-        <h1 class="project-title">Etrade</h1>
-        <p class="project-subtitle">发现 CEX 与 DEX 之间的历史套利机会</p>
-      </div>
-
-      <a-divider />
-
-      <div class="description-section">
-        <p>
-          欢迎使用 Etrade ！本平台旨在通过分析历史交易数据，
-          可视化展示中心化交易所 (Binance) 与去中心化交易所 (Uniswap V3)
-          之间的价格差异，并识别潜在的非原子套利机会。
-        </p>
-        <p>
-          请选择您感兴趣的功能模块：
-        </p>
-      </div>
-
-      <div class="navigation-buttons">
-        <a-button type="primary" size="large" @click="goToComparison" class="nav-button">
-          <LineChartOutlined />
-          价格可视化对比
-        </a-button>
-        <a-button type="primary" size="large" @click="goToOpportunities" class="nav-button" ghost>
-           <DollarOutlined />
-          套利机会列表
-        </a-button>
-        </div>
-    </a-card>
-
-    <footer class="home-footer">
-      © {{ new Date().getFullYear() }} SRE2025FallGroup. All Rights Reserved.
-    </footer>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { useRouter } from 'vue-router';
-import { LineChartOutlined, DollarOutlined } from '@ant-design/icons-vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import {
+  BarChart3,
+  TrendingUp,
+  Database,
+  Activity,
+  Sun,
+  Moon,
+} from 'lucide-vue-next';
 
-const router = useRouter();
+import PriceComparison from '../components/dashboard/PriceComparison.vue';
+import ArbitrageOpportunities from '../components/dashboard/ArbitrageOpportunities.vue';
+import DataManagement from '../components/dashboard/DataManagement.vue';
 
-const goToComparison = () => {
-  // 确保你的路由配置中 '/comparison' 指向 PriceComparisonView.vue
-  router.push('/comparison'); 
+type TabType = 'comparison' | 'arbitrage' | 'management';
+type Theme = 'light' | 'dark';
+
+const activeTab = ref<TabType>('comparison');
+const theme = ref<Theme>('dark');
+const currentTime = ref(new Date().toLocaleTimeString('en-US'));
+let timer: ReturnType<typeof setInterval> | null = null;
+
+const toggleTheme = () => {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark';
 };
 
-const goToOpportunities = () => {
-  // 确保你的路由配置中 '/opportunities' 指向 OpportunitiesView.vue
-  router.push('/opportunities'); 
-};
+onMounted(() => {
+  timer = setInterval(() => {
+    currentTime.value = new Date().toLocaleTimeString('en-US');
+  }, 1000);
+});
+
+onBeforeUnmount(() => {
+  if (timer) clearInterval(timer);
+});
+
+const isDark = computed(() => theme.value === 'dark');
+
+const tabs: Array<{ id: TabType; label: string; icon: typeof BarChart3 }> = [
+  { id: 'comparison', label: 'Price Comparison', icon: BarChart3 },
+  { id: 'arbitrage', label: 'Arbitrage Opportunities', icon: TrendingUp },
+  { id: 'management', label: 'Data Management', icon: Database },
+];
 </script>
 
-<style scoped>
-.home-container {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #f0f2f5 0%, #e6f7ff 100%); /* 淡雅渐变背景 */
-  padding: 40px 20px;
-  box-sizing: border-box;
-}
+<template>
+  <div :class="['min-h-screen transition-colors', isDark ? 'bg-[#0d1117]' : 'bg-[#f6f8fa]']">
+    <div class="relative">
+      <header
+        :class="[
+          'border-b',
+          isDark ? 'bg-[#161b22] border-[#30363d]' : 'bg-white border-[#d0d7de]',
+        ]"
+      >
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 bg-[#238636] rounded flex items-center justify-center">
+                <BarChart3 class="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">
+                  Crypto Arbitrage System
+                </h1>
+                <p
+                  class="text-xs"
+                  :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'"
+                >
+                  Analysis Platform v2.0
+                </p>
+              </div>
+            </div>
 
-.welcome-card {
-  width: 100%;
-  max-width: 800px;
-  background: #ffffff;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  border-radius: 16px;
-  padding: 40px;
-  text-align: center;
-  animation: fadeIn 0.8s ease-out;
-}
+            <div class="flex items-center gap-3">
+              <button
+                type="button"
+                @click="toggleTheme"
+                :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+                :class="[
+                  'p-2 rounded-md transition-colors border',
+                  isDark
+                    ? 'bg-[#21262d] border-[#30363d] text-[#7d8590] hover:text-[#e6edf3] hover:border-[#58a6ff]'
+                    : 'bg-[#f6f8fa] border-[#d0d7de] text-[#57606a] hover:text-[#24292f] hover:border-[#0969da]',
+                ]"
+              >
+                <component :is="isDark ? Sun : Moon" class="w-4 h-4" />
+              </button>
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+              <div
+                class="flex items-center gap-2 px-2.5 py-1 rounded-md"
+                :class="
+                  isDark
+                    ? 'bg-[#238636]/10 border border-[#238636]/30'
+                    : 'bg-[#dafbe1] border border-[#54a668]'
+                "
+              >
+                <div class="w-2 h-2 bg-[#3fb950] rounded-full" />
+                <span class="text-xs" :class="isDark ? 'text-[#3fb950]' : 'text-[#1a7f37]'">
+                  Online
+                </span>
+              </div>
 
-.logo-section {
-  margin-bottom: 30px;
-}
+              <div
+                class="flex items-center gap-2 px-2.5 py-1 rounded-md border"
+                :class="isDark ? 'bg-[#21262d] border-[#30363d]' : 'bg-[#f6f8fa] border-[#d0d7de]'"
+              >
+                <Activity
+                  class="w-3.5 h-3.5"
+                  :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'"
+                />
+                <span class="text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+                  {{ currentTime }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
 
-.logo-image {
-  width: fit-content; /* 根据你的Logo调整大小 */
-  height: fit-content;
-  margin-bottom: 20px;
-  animation: bounceIn 1s ease;
-}
+      <div
+        :class="[
+          'border-b',
+          isDark ? 'bg-[#0d1117] border-[#21262d]' : 'bg-[#f6f8fa] border-[#d0d7de]',
+        ]"
+      >
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <nav class="flex gap-2">
+            <button
+              v-for="tab in tabs"
+              :key="tab.id"
+              type="button"
+              class="flex items-center gap-2 py-3 px-4 border-b-2 transition-colors text-sm"
+              :class="[
+                activeTab === tab.id
+                  ? isDark
+                    ? 'border-[#f78166] text-[#e6edf3]'
+                    : 'border-[#fd8c73] text-[#24292f]'
+                  : isDark
+                    ? 'border-transparent text-[#7d8590] hover:text-[#e6edf3] hover:border-[#6e7681]'
+                    : 'border-transparent text-[#57606a] hover:text-[#24292f] hover:border-[#d0d7de]',
+              ]"
+              @click="activeTab = tab.id"
+            >
+              <component :is="tab.icon" class="w-4 h-4" />
+              {{ tab.label }}
+            </button>
+          </nav>
+        </div>
+      </div>
 
-@keyframes bounceIn {
-  0%, 20%, 40%, 60%, 80%, 100% {
-    animation-timing-function: cubic-bezier(0.215, 0.610, 0.355, 1.000);
-  }
-  0% { opacity: 0; transform: scale3d(.3, .3, .3); }
-  20% { transform: scale3d(1.1, 1.1, 1.1); }
-  40% { transform: scale3d(.9, .9, .9); }
-  60% { opacity: 1; transform: scale3d(1.03, 1.03, 1.03); }
-  80% { transform: scale3d(.97, .97, .97); }
-  100% { opacity: 1; transform: scale3d(1, 1, 1); }
-}
-
-.project-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: #1a1a1a;
-  margin-bottom: 8px;
-}
-
-.project-subtitle {
-  font-size: 16px;
-  color: #666;
-  margin-bottom: 30px;
-}
-
-.description-section p {
-  font-size: 16px;
-  color: #555;
-  line-height: 1.8;
-  margin-bottom: 20px;
-}
-
-.navigation-buttons {
-  margin-top: 40px;
-  display: flex;
-  justify-content: center;
-  gap: 20px; /* 按钮间距 */
-}
-
-.nav-button {
-  min-width: 200px; /* 固定按钮宽度 */
-  border-radius: 8px;
-  transition: all 0.3s ease;
-}
-
-.nav-button:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
-}
-
-.home-footer {
-  margin-top: 30px;
-  font-size: 14px;
-  color: #999;
-}
-</style>
+      <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <PriceComparison v-if="activeTab === 'comparison'" :theme="theme" />
+        <ArbitrageOpportunities v-else-if="activeTab === 'arbitrage'" :theme="theme" />
+        <DataManagement v-else :theme="theme" />
+      </main>
+    </div>
+  </div>
+</template>

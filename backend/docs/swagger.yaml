@@ -1,0 +1,172 @@
+definitions:
+  api.ErrorResponse:
+    properties:
+      code:
+        example: 40001
+        type: integer
+      message:
+        example: 请求参数无效
+        type: string
+    type: object
+  api.OpportunitiesResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/models.ArbitrageOpportunity'
+        type: array
+      pagination:
+        $ref: '#/definitions/api.PaginationData'
+    type: object
+  api.PaginationData:
+    properties:
+      limit:
+        example: 10
+        type: integer
+      page:
+        example: 1
+        type: integer
+      total:
+        example: 150
+        type: integer
+    type: object
+  api.PriceComparisonResponse:
+    properties:
+      binance:
+        items:
+          items: {}
+          type: array
+        type: array
+      uniswap:
+        items:
+          items: {}
+          type: array
+        type: array
+    type: object
+  api.SuccessOpportunitiesResponse:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/api.OpportunitiesResponse'
+      message:
+        example: success
+        type: string
+    type: object
+  api.SuccessPriceResponse:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data:
+        $ref: '#/definitions/api.PriceComparisonResponse'
+      message:
+        example: success
+        type: string
+    type: object
+  models.ArbitrageOpportunity:
+    properties:
+      buy_platform:
+        type: string
+      buy_price:
+        type: number
+      id:
+        type: integer
+      profit_usdt:
+        type: number
+      sell_platform:
+        type: string
+      sell_price:
+        type: number
+    type: object
+info:
+  contact: {}
+paths:
+  /opportunities:
+    get:
+      consumes:
+      - application/json
+      description: (SRS FR-5.3) 获取套利机会列表，支持分页和排序
+      parameters:
+      - default: 1
+        description: 页码
+        example: 1
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 每页数量
+        example: 10
+        in: query
+        name: limit
+        type: integer
+      - default: profit_usdt
+        description: 排序字段 (snake_case)
+        example: profit_usdt
+        in: query
+        name: sort_by
+        type: string
+      - default: desc
+        description: 排序顺序 (asc/desc)
+        enum:
+        - asc
+        - desc
+        example: desc
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应 (符合 API 规范 3.1.B)
+          schema:
+            $ref: '#/definitions/api.SuccessOpportunitiesResponse'
+        "400":
+          description: '参数错误 (Code: 40001, 40002)'
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: '服务器内部错误 (Code: 50001)'
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 获取套利机会列表 (UC-02)
+      tags:
+      - Opportunities
+  /price-comparison:
+    get:
+      consumes:
+      - application/json
+      description: (SRS FR-5.2) 获取用于 ECharts 渲染的聚合价格数据
+      parameters:
+      - description: 开始时间 (13位毫秒时间戳)
+        example: 1756694400000
+        in: query
+        name: startTime
+        required: true
+        type: integer
+      - description: 结束时间 (13位毫秒时间戳)
+        example: 1756780799000
+        in: query
+        name: endTime
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 成功响应 (符合 API 规范 3.1.A)
+          schema:
+            $ref: '#/definitions/api.SuccessPriceResponse'
+        "400":
+          description: '参数错误 (Code: 40001)'
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: '服务器内部错误 (Code: 50001)'
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 获取价格对比数据 (UC-01)
+      tags:
+      - Visualization
+swagger: "2.0"

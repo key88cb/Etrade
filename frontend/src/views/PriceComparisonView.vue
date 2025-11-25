@@ -185,15 +185,10 @@ const fetchChartData = async () => {
   const endTimeMs = selectedDateRange.value[1].utc().endOf('day').valueOf();
 
   try {
-    // 可以将时间戳作为查询参数传递给API 但是MVP版本中没有完成后端对应的接口
-    const response = await api.getPriceComparisonData(
-    //   {
-    //   params: {
-    //     startTime: startTimeMs,
-    //     endTime: endTimeMs
-    //   }
-    // }
-  );
+    const response = await api.getPriceComparisonData({
+      startTime: startTimeMs,
+      endTime: endTimeMs,
+    });
 
     // 假设 api 返回格式 { code: 200, data: { ... } } 或直接返回数据
     // 需要根据你的Go后端 utils.Success 返回格式调整

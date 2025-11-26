@@ -70,7 +70,7 @@ def parse_cli_args() -> Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp]]:
 
 
 def fetch_price_pairs(
-        start_time: Optional[pd.Timestamp] = None, end_time: Optional[pd.Timestamp] = None
+    start_time: Optional[pd.Timestamp] = None, end_time: Optional[pd.Timestamp] = None
 ) -> list:
     """
     使用单个 SQL JOIN 查询，让数据库服务器完成所有繁重的计算
@@ -105,9 +105,7 @@ def fetch_price_pairs(
         if "end_ts" in params:
             del params["end_ts"]
 
-    where_clause = (
-        f"WHERE {' AND '.join(time_conditions)}" if time_conditions else ""
-    )
+    where_clause = f"WHERE {' AND '.join(time_conditions)}" if time_conditions else ""
 
     # 3. 终极 SQL 查询
     # 使用 CTEs (Common Table Expressions) 来提高可读性

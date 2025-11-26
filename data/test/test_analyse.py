@@ -44,11 +44,14 @@ with patch(
 ):
     with patch("yaml.safe_load", return_value=mock_config):
         with patch("psycopg2.connect", return_value=mock_conn):
-            from block_chain.analyse import (analyze_opportunities,
-                                             calculate_profit_buy_cex_sell_dex,
-                                             calculate_profit_buy_dex_sell_cex,
-                                             fetch_price_pairs, parse_cli_args,
-                                             save_results)
+            from block_chain.analyse import (
+                analyze_opportunities,
+                calculate_profit_buy_cex_sell_dex,
+                calculate_profit_buy_dex_sell_cex,
+                fetch_price_pairs,
+                parse_cli_args,
+                save_results,
+            )
 
 
 class TestCalculateProfitBuyCexSellDex:

@@ -21,8 +21,11 @@ parent_dir = os.path.dirname(current_dir)
 # sys.path 是 Python 解释器查找模块的路径列表
 sys.path.insert(0, parent_dir)
 
-from block_chain.collect_binance import (count_lines, import_data_to_database,
-                                         process_chunk)
+from block_chain.collect_binance import (
+    count_lines,
+    import_data_to_database,
+    process_chunk,
+)
 
 
 class TestCountLines:

@@ -95,7 +95,7 @@ jobs:
 
     - name: isort check (data)
       working-directory: ./data
-      run: isort --check-only .
+      run: isort --check-only --profile black .
 
     - name: Set up Python
       uses: actions/setup-python@v5

@@ -69,84 +69,104 @@ def parse_cli_args() -> Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp]]:
     return start_ts, end_ts
 
 
-def load_data(
+def fetch_price_pairs(
     start_time: Optional[pd.Timestamp] = None, end_time: Optional[pd.Timestamp] = None
-):
-    logger.info("正在从数据库加载数据...")
+) -> list:
+    """
+    使用单个 SQL JOIN 查询，让数据库服务器完成所有繁重的计算
+    (匹配和求平均值)，只返回最终需要的数据对。
+    """
+    logger.info("正在请求服务器计算并返回所有价格对...")
     time_range_msg = "全量数据"
     if start_time or end_time:
         time_range_msg = f"{start_time or '最早'} -> {end_time or '最新'}"
     logger.info(f"筛选时间范围：{time_range_msg}")
 
-    uni_query = "SELECT block_time, price, gas_price FROM uniswap_swaps"
-    uni_params = []
-    uni_conditions = []
-    if start_time is not None:
-        uni_conditions.append("block_time >= %s")
-        uni_params.append(start_time.to_pydatetime())
-    if end_time is not None:
-        uni_conditions.append("block_time <= %s")
-        uni_params.append(end_time.to_pydatetime())
-    if uni_conditions:
-        uni_query += " WHERE " + " AND ".join(uni_conditions)
+    # SQL 查询的参数
+    # 1. 将 Python 变量传入 SQL
+    params = {
+        "delay_seconds": f"{TIME_DELAY_SECONDS} seconds",
+        "window_seconds": "5 seconds",  # 窗口是 +/- 5秒
+        "start_ts": start_time.to_pydatetime() if start_time else None,
+        "end_ts": end_time.to_pydatetime() if end_time else None,
+    }
 
-    cur.execute(uni_query, uni_params)
-    uni_rows = cur.fetchall()
-    uniswap_df = pd.DataFrame(uni_rows, columns=["block_time", "price", "gas_price"])
-    # 将 Decimal/NUMERIC 转为 float，避免 float 与 Decimal 混算错误
-    uniswap_df["price"] = pd.to_numeric(uniswap_df["price"], errors="coerce").astype(
-        float
-    )
-    uniswap_df["gas_price"] = pd.to_numeric(
-        uniswap_df["gas_price"], errors="coerce"
-    ).astype(float)
+    # 2. 构建 WHERE 子句
+    time_conditions = []
+    if params["start_ts"]:
+        time_conditions.append("u.block_time >= %(start_ts)s")
+    if params["end_ts"]:
+        time_conditions.append("u.block_time <= %(end_ts)s")
 
-    bin_query = "SELECT trade_time, price FROM binance_trades"
-    bin_params = []
-    bin_conditions = []
-    if start_time is not None:
-        bin_conditions.append("trade_time >= %s")
-        bin_params.append(start_time.to_pydatetime())
-    if end_time is not None:
-        bin_conditions.append("trade_time <= %s")
-        bin_params.append(end_time.to_pydatetime())
-    if bin_conditions:
-        bin_query += " WHERE " + " AND ".join(bin_conditions)
+    # 如果没有时间范围，则删除键以避免SQL错误
+    if not time_conditions:
+        if "start_ts" in params:
+            del params["start_ts"]
+        if "end_ts" in params:
+            del params["end_ts"]
 
-    cur.execute(bin_query, bin_params)
-    bin_rows = cur.fetchall()
-    binance_df = pd.DataFrame(bin_rows, columns=["trade_time", "price"])
-    binance_df["price"] = pd.to_numeric(binance_df["price"], errors="coerce").astype(
-        float
-    )
+    where_clause = f"WHERE {' AND '.join(time_conditions)}" if time_conditions else ""
 
-    # 转换时间戳为datetime对象，并统一为UTC时区
-    uniswap_df["block_time"] = pd.to_datetime(uniswap_df["block_time"], utc=True)
-    binance_df["trade_time"] = pd.to_datetime(binance_df["trade_time"], utc=True)
-
-    # 将时间戳设置为索引
-    uniswap_df.set_index("block_time", inplace=True)
-    binance_df.set_index("trade_time", inplace=True)
-
-    # 在使用 .loc 时间切片之前，必须确保索引已排序
-    logger.info("正在排序索引 (这对于大型DataFrame可能需要一些时间)...")
-    uniswap_df.sort_index(inplace=True)
-    binance_df.sort_index(inplace=True)
-    logger.info("索引排序完成。")
-
-    logger.info(
-        f"加载完成: {len(uniswap_df)} 条Uniswap记录, {len(binance_df)} 条币安记录"
-    )
-    if not uniswap_df.empty:
-        logger.info(
-            f"Uniswap 数据时间范围: {uniswap_df.index.min()} -> {uniswap_df.index.max()}"
+    # 3. 终极 SQL 查询
+    # 使用 CTEs (Common Table Expressions) 来提高可读性
+    # 并使用 JOIN ... GROUP BY 来计算币安的平均价格
+    sql_query = f"""
+        WITH 
+        config AS (
+            -- 1. 定义我们的常量
+            SELECT 
+                %(delay_seconds)s::interval AS delay,
+                %(window_seconds)s::interval AS window
+        ),
+        uniswap_data AS (
+            -- 2. 筛选 Uniswap 数据
+            SELECT 
+                block_time, 
+                price AS uniswap_price, 
+                gas_price
+            FROM uniswap_swaps u
+            {where_clause}
+        ),
+        binance_avg AS (
+            -- 3. [核心] JOIN 两个表并计算币安平均价格
+            -- 这会利用两个表上的时间索引，速度非常快
+            SELECT 
+                u.block_time,
+                AVG(b.price) AS binance_price
+            FROM 
+                uniswap_data u
+            CROSS JOIN -- (与 config 表交叉连接)
+                config c 
+            JOIN 
+                binance_trades b 
+            ON 
+                b.trade_time BETWEEN 
+                    (u.block_time - c.delay - c.window) -- <--- 修改这里
+                AND 
+                    (u.block_time - c.delay + c.window) -- <--- 修改这里
+            GROUP BY 
+                u.block_time
         )
-    if not binance_df.empty:
-        logger.info(
-            f"Binance 数据时间范围: {binance_df.index.min()} -> {binance_df.index.max()}"
-        )
+        -- 4. 最终将所有需要的数据组合在一起
+        SELECT 
+            u.block_time,
+            u.uniswap_price,
+            u.gas_price,
+            b.binance_price
+        FROM 
+            uniswap_data u
+        JOIN 
+            binance_avg b ON u.block_time = b.block_time
+        ORDER BY
+            u.block_time;
+    """
 
-    return uniswap_df, binance_df
+    logger.info("正在执行服务器端计算... (这可能需要几秒钟)")
+    cur.execute(sql_query, params)
+    price_pairs = cur.fetchall()
+    logger.info(f"计算完成，从服务器收到 {len(price_pairs)} 对价格。")
+
+    return price_pairs
 
 
 def calculate_profit_buy_cex_sell_dex(investment, price_cex, price_dex, gas_price):
@@ -163,11 +183,13 @@ def calculate_profit_buy_cex_sell_dex(investment, price_cex, price_dex, gas_pric
 
 
 def calculate_profit_buy_dex_sell_cex(investment, price_dex, price_cex, gas_price):
+    # --- BUG 修复：添加缺失的变量定义 ---
     gas_cost_eth = (ESTIMATED_GAS_USED * gas_price) / 1e18
     gas_cost_usdt = gas_cost_eth * price_dex
 
     total_investment = investment + gas_cost_usdt
     uniswap_fee = investment * UNISWAP_FEE_RATE
+    # --- 修复结束 ---
 
     eth_acquired = (investment - uniswap_fee) / price_dex
     gross_revenue_usdt = eth_acquired * price_cex
@@ -178,34 +200,35 @@ def calculate_profit_buy_dex_sell_cex(investment, price_dex, price_cex, gas_pric
     return net_profit
 
 
-def analyze_opportunities(uniswap_df, binance_df):
-    logger.info("开始分析套利机会...")
+def analyze_opportunities(price_pairs: list):
+    """
+    修改后的函数：不再执行任何数据库查询。
+    它只遍历服务器返回的配对列表，并进行纯 Python 计算。
+    """
+    logger.info("开始在本地内存中分析套利机会...")
     profitable_trades = []
 
-    #
-    for index, swap in uniswap_df.iterrows():
-        uniswap_price = swap["price"]
-        uniswap_time = index
-        gas_price = swap["gas_price"]
+    for row in price_pairs:
+        # 从行中解包数据
+        # (我们不需要 block_time，但保留它以便调试)
+        # block_time = row[0]
+        uniswap_price = pd.to_numeric(row[1], errors="coerce")
+        gas_price = pd.to_numeric(row[2], errors="coerce")
+        binance_price = pd.to_numeric(row[3], errors="coerce")
 
-        # 计算出需要在币安上查询价格的时间点
-        binance_lookup_time = uniswap_time - pd.Timedelta(seconds=TIME_DELAY_SECONDS)
-
-        # 在币安数据中查找这个时间点附近的价格
-        # 取一个10秒的小窗口，计算平均价，平滑噪音
-        window_start = binance_lookup_time - pd.Timedelta(seconds=5)
-        window_end = binance_lookup_time + pd.Timedelta(seconds=5)
-
-        relevant_binance_trades = binance_df.loc[window_start:window_end]
-
-        if relevant_binance_trades.empty:
-            continue  # 如果这个时间窗口内币安没有交易，则跳过
-
-        binance_price = relevant_binance_trades["price"].mean()
+        # 检查数据是否有效
+        if pd.isna(uniswap_price) or pd.isna(gas_price) or pd.isna(binance_price):
+            continue
 
         # 方向1: 币安买, Uniswap卖
         # 条件: Uniswap价格 > 币安价格
         if uniswap_price > binance_price:
+            # --- 添加新检查 ---
+            # 如果 binance_price (即 price_cex) 为 0，则无法计算，跳过
+            if binance_price == 0:
+                continue
+            # --- 检查结束 ---
+
             profit = calculate_profit_buy_cex_sell_dex(
                 INITIAL_INVESTMENT_USDT, binance_price, uniswap_price, gas_price
             )
@@ -218,13 +241,18 @@ def analyze_opportunities(uniswap_df, binance_df):
                         "buy_price": binance_price,
                         "sell_price": uniswap_price,
                         "profit_usdt": profit,
-                        # 可以添加更多信息，如时间戳等
                     }
                 )
 
         # 方向2: Uniswap买, 幣安卖
         # 条件: 币安价格 > Uniswap价格
         elif binance_price > uniswap_price:
+            # --- 添加新检查 ---
+            # 如果 uniswap_price (即 price_dex) 为 0，则无法计算，跳过
+            if uniswap_price == 0:
+                continue
+            # --- 检查结束 ---
+
             profit = calculate_profit_buy_dex_sell_cex(
                 INITIAL_INVESTMENT_USDT, uniswap_price, binance_price, gas_price
             )
@@ -290,11 +318,12 @@ def save_results(results):
 if __name__ == "__main__":
     start_ts, end_ts = parse_cli_args()
 
-    # 1. 加载数据
-    uniswap_df, binance_df = load_data(start_ts, end_ts)
+    # 1. 替换 load_data 为 fetch_price_pairs
+    # 这一步现在是唯一的数据库查询
+    price_pairs_list = fetch_price_pairs(start_ts, end_ts)
 
-    # 2. 执行分析
-    opportunities = analyze_opportunities(uniswap_df, binance_df)
+    # 2. 执行分析 (现在在纯 Python 内存中进行)
+    opportunities = analyze_opportunities(price_pairs_list)
 
     # 3. 保存结果
     save_results(opportunities)

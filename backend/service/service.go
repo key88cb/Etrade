@@ -1,7 +1,6 @@
 package service
 
 import (
-	"backend/db"
 	"backend/models"
 	"fmt"  // 导入 fmt
 	"time" // 导入 time
@@ -13,8 +12,8 @@ type Service struct {
 	db *gorm.DB
 }
 
-func NewService() *Service {
-	return &Service{db: db.GetDB()}
+func NewService(db *gorm.DB) *Service {
+	return &Service{db: db}
 }
 
 // 添加了分页和排序参数

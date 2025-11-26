@@ -21,11 +21,8 @@ parent_dir = os.path.dirname(current_dir)
 # sys.path 是 Python 解释器查找模块的路径列表
 sys.path.insert(0, parent_dir)
 
-from block_chain.collect_binance import (
-    count_lines,
-    import_data_to_database,
-    process_chunk,
-)
+from block_chain.collect_binance import (count_lines, import_data_to_database,
+                                         process_chunk)
 
 
 class TestCountLines:
@@ -263,9 +260,7 @@ class TestProcessChunk:
         assert rows_counter[0] >= target_rows
         assert should_stop is True
 
-    def test_process_chunk_dropna_after_timestamp_conversion(
-        self, mock_db_connection
-    ):
+    def test_process_chunk_dropna_after_timestamp_conversion(self, mock_db_connection):
         """
         测试：时间戳转换后dropna导致chunk为空的情况
         """

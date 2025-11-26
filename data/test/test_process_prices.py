@@ -1,6 +1,7 @@
 """
 process_prices.py 的单元测试
 """
+
 import datetime
 import os
 import sys
@@ -102,9 +103,7 @@ class TestProcessPricesModule:
         ]
 
         # 模拟一天的查询
-        day_start = datetime.datetime(
-            2025, 9, 1, 0, 0, 0, tzinfo=datetime.timezone.utc
-        )
+        day_start = datetime.datetime(2025, 9, 1, 0, 0, 0, tzinfo=datetime.timezone.utc)
         day_end = datetime.datetime(
             2025, 9, 1, 23, 59, 59, tzinfo=datetime.timezone.utc
         )
@@ -143,9 +142,7 @@ class TestProcessPricesModule:
             ),
         ]
 
-        day_df = pd.DataFrame(
-            rows, columns=["time_bucket", "source", "average_price"]
-        )
+        day_df = pd.DataFrame(rows, columns=["time_bucket", "source", "average_price"])
 
         assert len(day_df) == 2
         assert list(day_df.columns) == ["time_bucket", "source", "average_price"]
@@ -252,9 +249,7 @@ class TestProcessPricesModule:
     @patch("block_chain.process_prices.cur")
     @patch("block_chain.process_prices.conn")
     @patch("block_chain.process_prices.logger")
-    def test_save_results_rollback_on_error(
-        self, mock_logger, mock_conn, mock_cur
-    ):
+    def test_save_results_rollback_on_error(self, mock_logger, mock_conn, mock_cur):
         """
         测试：保存结果时出错应该回滚
         """
@@ -317,9 +312,7 @@ class TestProcessPricesModule:
         mock_cur.execute.side_effect = Exception("Query failed")
         mock_cur.fetchall.return_value = []
 
-        day_start = datetime.datetime(
-            2025, 9, 1, 0, 0, 0, tzinfo=datetime.timezone.utc
-        )
+        day_start = datetime.datetime(2025, 9, 1, 0, 0, 0, tzinfo=datetime.timezone.utc)
         day_end = datetime.datetime(
             2025, 9, 1, 23, 59, 59, tzinfo=datetime.timezone.utc
         )
@@ -353,9 +346,7 @@ class TestProcessPricesModule:
         测试：SQL参数结构
         """
         AGGREGATION_INTERVAL = "minute"
-        day_start = datetime.datetime(
-            2025, 9, 1, 0, 0, 0, tzinfo=datetime.timezone.utc
-        )
+        day_start = datetime.datetime(2025, 9, 1, 0, 0, 0, tzinfo=datetime.timezone.utc)
         day_end = datetime.datetime(
             2025, 9, 1, 23, 59, 59, tzinfo=datetime.timezone.utc
         )
@@ -399,4 +390,3 @@ class TestProcessPricesModule:
         mock_conn.close()
 
         assert True  # 如果没有抛出异常，测试通过
-

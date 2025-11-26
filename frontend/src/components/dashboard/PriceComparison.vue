@@ -42,10 +42,11 @@ const disposeChart = () => {
 };
 
 const renderChart = () => {
-  if (
-    !chartRef.value ||
-    (!seriesData.value.uniswap.length && !seriesData.value.binance.length)
-  ) {
+  if (!chartRef.value) {
+    return;
+  }
+
+  if (!seriesData.value.uniswap.length && !seriesData.value.binance.length) {
     disposeChart();
     return;
   }
@@ -277,6 +278,15 @@ watch(
   },
 );
 
+watch(
+  () => chartRef.value,
+  (element) => {
+    if (element && hasData.value) {
+      nextTick(() => renderChart());
+    }
+  },
+);
+
 onBeforeUnmount(() => disposeChart());
 
 const buildTimestampRange = () => {
@@ -320,6 +330,8 @@ const handleLoad = async () => {
       binance: normalizeSeries(payload.binance),
     };
     loadingState.value = 'success';
+    await nextTick();
+    renderChart();
   } catch (error: any) {
     console.error(error);
     seriesData.value = { uniswap: [], binance: [] };
@@ -399,59 +411,65 @@ const handleLoad = async () => {
       class="rounded-md border p-4"
       :class="isDark ? 'bg-[#161b22] border-[#30363d]' : 'bg-white border-[#d0d7de]'"
     >
-      <div
-        v-if="loadingState === 'idle'"
-        class="h-[500px] flex items-center justify-center"
-        :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'"
-      >
-        <div class="text-center">
-          <BarChart3 class="w-16 h-16 mx-auto mb-3 opacity-50" />
-          <p class="text-sm">Select date range and click "Load Data"</p>
-          <p class="text-xs mt-1" :class="isDark ? 'text-[#6e7681]' : 'text-[#6e7781]'">
-            to view price chart
-          </p>
+      <div class="relative h-[500px]">
+        <div
+          ref="chartRef"
+          class="h-full w-full"
+          v-show="loadingState === 'success' && hasData"
+        />
+
+        <div
+          v-if="loadingState === 'idle'"
+          class="absolute inset-0 flex items-center justify-center"
+          :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'"
+        >
+          <div class="text-center">
+            <BarChart3 class="w-16 h-16 mx-auto mb-3 opacity-50" />
+            <p class="text-sm">Select date range and click "Load Data"</p>
+            <p class="text-xs mt-1" :class="isDark ? 'text-[#6e7681]' : 'text-[#6e7781]'">
+              to view price chart
+            </p>
+          </div>
+        </div>
+
+        <div
+          v-else-if="loadingState === 'loading'"
+          class="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm"
+        >
+          <div class="text-center">
+            <Loader2 class="w-12 h-12 text-[#58a6ff] animate-spin mx-auto mb-3" />
+            <p class="text-[#58a6ff] text-sm">Loading data...</p>
+          </div>
+        </div>
+
+        <div
+          v-else-if="loadingState === 'error'"
+          class="absolute inset-0 flex items-center justify-center"
+        >
+          <div class="text-center">
+            <AlertCircle class="w-12 h-12 text-[#f85149] mx-auto mb-3" />
+            <p class="text-[#f85149] text-sm">
+              {{ errorMessage || 'Failed to load data' }}
+            </p>
+            <p class="text-xs mt-1" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+              Please try again
+            </p>
+          </div>
+        </div>
+
+        <div
+          v-else-if="loadingState === 'success' && !hasData"
+          class="absolute inset-0 flex items-center justify-center"
+        >
+          <div class="text-center">
+            <AlertCircle class="w-12 h-12 text-[#d29922] mx-auto mb-3" />
+            <p class="text-[#d29922] text-sm">No data available</p>
+            <p class="text-xs mt-1" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+              for selected time range
+            </p>
+          </div>
         </div>
       </div>
-
-      <div
-        v-else-if="loadingState === 'loading'"
-        class="h-[500px] flex items-center justify-center"
-      >
-        <div class="text-center">
-          <Loader2 class="w-12 h-12 text-[#58a6ff] animate-spin mx-auto mb-3" />
-          <p class="text-[#58a6ff] text-sm">Loading data...</p>
-        </div>
-      </div>
-
-      <div
-        v-else-if="loadingState === 'error'"
-        class="h-[500px] flex items-center justify-center"
-      >
-        <div class="text-center">
-          <AlertCircle class="w-12 h-12 text-[#f85149] mx-auto mb-3" />
-          <p class="text-[#f85149] text-sm">
-            {{ errorMessage || 'Failed to load data' }}
-          </p>
-          <p class="text-xs mt-1" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
-            Please try again
-          </p>
-        </div>
-      </div>
-
-      <div
-        v-else-if="loadingState === 'success' && !hasData"
-        class="h-[500px] flex items-center justify-center"
-      >
-        <div class="text-center">
-          <AlertCircle class="w-12 h-12 text-[#d29922] mx-auto mb-3" />
-          <p class="text-[#d29922] text-sm">No data available</p>
-          <p class="text-xs mt-1" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
-            for selected time range
-          </p>
-        </div>
-      </div>
-
-      <div v-else class="h-[500px]" ref="chartRef" />
     </div>
 
     <div

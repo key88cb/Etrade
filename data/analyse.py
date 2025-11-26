@@ -1,3 +1,6 @@
+import argparse
+from typing import Optional, Tuple
+
 import pandas as pd
 import psycopg2
 import yaml
@@ -11,7 +14,7 @@ UNISWAP_FEE_RATE = 0.0005  # Uniswap池费率
 ESTIMATED_GAS_USED = 20  # Gas消耗量估算值
 
 # 策略参数
-INITIAL_INVESTMENT_USDT = 10000.0  # 每次套利的初始投入资金
+INITIAL_INVESTMENT_USDT = 100000.0  # 每次套利的初始投入资金
 TIME_DELAY_SECONDS = 3  # 非原子套利的执行延迟估算 (6秒)
 PROFIT_THRESHOLD_USDT = 10  # 只记录利润大于1 USDT的机会
 # 2. 数据库连接 (psycopg2)
@@ -34,10 +37,60 @@ conn.autocommit = False
 cur = conn.cursor()
 
 
-def load_data():
+def parse_cli_args() -> Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp]]:
+    parser = argparse.ArgumentParser(
+        description="从数据库中筛选指定时间范围的交易数据并执行套利分析。",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--start",
+        type=str,
+        help="起始时间 (ISO8601，如 2025-09-01T00:00:00Z)。若未提供，则从最早数据开始。",
+    )
+    parser.add_argument(
+        "--end",
+        type=str,
+        help="结束时间 (ISO8601，如 2025-09-07T23:59:59Z)。若未提供，则一直到最新数据。",
+    )
+    args = parser.parse_args()
+
+    def to_timestamp(value: Optional[str]) -> Optional[pd.Timestamp]:
+        if not value:
+            return None
+        ts = pd.to_datetime(value, utc=True, errors="raise")
+        return ts
+
+    start_ts = to_timestamp(args.start)
+    end_ts = to_timestamp(args.end)
+
+    if start_ts and end_ts and start_ts > end_ts:
+        parser.error("参数错误：start 时间必须早于 end 时间。")
+
+    return start_ts, end_ts
+
+
+def load_data(
+    start_time: Optional[pd.Timestamp] = None, end_time: Optional[pd.Timestamp] = None
+):
     logger.info("正在从数据库加载数据...")
-    # 只提取分析所需列，减少内存开销
-    cur.execute("SELECT block_time, price, gas_price FROM uniswap_swaps")
+    time_range_msg = "全量数据"
+    if start_time or end_time:
+        time_range_msg = f"{start_time or '最早'} -> {end_time or '最新'}"
+    logger.info(f"筛选时间范围：{time_range_msg}")
+
+    uni_query = "SELECT block_time, price, gas_price FROM uniswap_swaps"
+    uni_params = []
+    uni_conditions = []
+    if start_time is not None:
+        uni_conditions.append("block_time >= %s")
+        uni_params.append(start_time.to_pydatetime())
+    if end_time is not None:
+        uni_conditions.append("block_time <= %s")
+        uni_params.append(end_time.to_pydatetime())
+    if uni_conditions:
+        uni_query += " WHERE " + " AND ".join(uni_conditions)
+
+    cur.execute(uni_query, uni_params)
     uni_rows = cur.fetchall()
     uniswap_df = pd.DataFrame(uni_rows, columns=["block_time", "price", "gas_price"])
     # 将 Decimal/NUMERIC 转为 float，避免 float 与 Decimal 混算错误
@@ -48,7 +101,19 @@ def load_data():
         uniswap_df["gas_price"], errors="coerce"
     ).astype(float)
 
-    cur.execute("SELECT trade_time, price FROM binance_trades")
+    bin_query = "SELECT trade_time, price FROM binance_trades"
+    bin_params = []
+    bin_conditions = []
+    if start_time is not None:
+        bin_conditions.append("trade_time >= %s")
+        bin_params.append(start_time.to_pydatetime())
+    if end_time is not None:
+        bin_conditions.append("trade_time <= %s")
+        bin_params.append(end_time.to_pydatetime())
+    if bin_conditions:
+        bin_query += " WHERE " + " AND ".join(bin_conditions)
+
+    cur.execute(bin_query, bin_params)
     bin_rows = cur.fetchall()
     binance_df = pd.DataFrame(bin_rows, columns=["trade_time", "price"])
     binance_df["price"] = pd.to_numeric(binance_df["price"], errors="coerce").astype(
@@ -223,8 +288,10 @@ def save_results(results):
 
 
 if __name__ == "__main__":
+    start_ts, end_ts = parse_cli_args()
+
     # 1. 加载数据
-    uniswap_df, binance_df = load_data()
+    uniswap_df, binance_df = load_data(start_ts, end_ts)
 
     # 2. 执行分析
     opportunities = analyze_opportunities(uniswap_df, binance_df)

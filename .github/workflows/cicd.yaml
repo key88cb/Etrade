@@ -2,9 +2,9 @@ name: Etrade CICD
 
 on:
   push:
-    branches: [ master, develop ]
+    branches: [ master, develop, 'dev_*' ]
   pull_request:
-    branches: [ master, develop ]
+    branches: [ master, develop, 'dev_*' ]
 
 jobs:
   backend-ci:

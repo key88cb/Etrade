@@ -18,7 +18,7 @@ INITIAL_INVESTMENT_USDT = 100000.0  # 每次套利的初始投入资金
 TIME_DELAY_SECONDS = 3  # 非原子套利的执行延迟估算 (6秒)
 PROFIT_THRESHOLD_USDT = 10  # 只记录利润大于1 USDT的机会
 # 2. 数据库连接 (psycopg2)
-with open("config/config.yaml", "r", encoding="utf-8") as file:
+with open("../config/config.yaml", "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)
     HOST = config["db"]["host"]
     PORT = config["db"]["port"]

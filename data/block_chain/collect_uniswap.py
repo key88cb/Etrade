@@ -1,3 +1,4 @@
+import os
 import threading
 import time
 from datetime import datetime, timezone
@@ -9,18 +10,27 @@ import yaml
 from loguru import logger
 from psycopg2.extras import execute_values
 
-with open("config/config.yaml", "r", encoding="utf-8") as file:
-    config = yaml.safe_load(file)
-
-API_KEY = config["the_graph"]["api_key"]
-GRAPH_API_URL = config["the_graph"]["graph_api_url"]
-POOL_ADDRESS = config["the_graph"]["uniswap_pool_address"]
-HOST = config["db"]["host"]
-PORT = config["db"]["port"]
-DATABASE = config["db"]["database"]
-USERNAME = config["db"]["username"]
-PASSWORD = config["db"]["password"]
-DB_CONNECTION_STRING = f"postgresql://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}"
+# 从配置文件加载配置
+_config_path = os.path.join(os.path.dirname(__file__), "..", "config", "config.yaml")
+try:
+    with open(_config_path, "r", encoding="utf-8") as file:
+        config = yaml.safe_load(file)
+    API_KEY = config["the_graph"]["api_key"]
+    GRAPH_API_URL = config["the_graph"]["graph_api_url"]
+    POOL_ADDRESS = config["the_graph"]["uniswap_pool_address"]
+    HOST = config["db"]["host"]
+    PORT = config["db"]["port"]
+    DATABASE = config["db"]["database"]
+    USERNAME = config["db"]["username"]
+    PASSWORD = config["db"]["password"]
+    DB_CONNECTION_STRING = (
+        f"postgresql://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}"
+    )
+except FileNotFoundError:
+    # 如果配置文件不存在（例如在测试环境中），使用默认值
+    API_KEY = GRAPH_API_URL = POOL_ADDRESS = None
+    HOST = PORT = DATABASE = USERNAME = PASSWORD = None
+    DB_CONNECTION_STRING = None
 
 
 def fetch_all_swaps(pool_address, start_ts, end_ts):
@@ -78,9 +88,10 @@ def fetch_all_swaps(pool_address, start_ts, end_ts):
             )
             response.raise_for_status()  # 如果请求失败则抛出异常
             swaps = response.json()["data"]["swaps"]
-        except (requests.exceptions.RequestException, KeyError) as e:
+        except Exception as e:
             logger.info(f"请求失败: {e}。5秒后重试...")
-            logger.error(f"请求失败: {response.text}")
+            if "response" in locals():
+                logger.error(f"请求失败: {response.text}")
             time.sleep(5)
             continue
 

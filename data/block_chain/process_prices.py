@@ -8,9 +8,8 @@ import psycopg2
 import yaml
 from loguru import logger
 from psycopg2.extras import execute_values
-from tqdm import tqdm
-
 from task_client import TaskClient, load_config_from_string
+from tqdm import tqdm
 
 with open("config/config.yaml", "r", encoding="utf-8") as file:
     _CONFIG = yaml.safe_load(file)
@@ -101,7 +100,9 @@ def _write_aggregated_prices(conn, df: pd.DataFrame, overwrite: bool):
     logger.info("聚合结果写入完成。")
 
 
-def run_process_prices(task_id: Optional[str] = None, config_json: Optional[str] = None):
+def run_process_prices(
+    task_id: Optional[str] = None, config_json: Optional[str] = None
+):
     config = load_config_from_string(config_json)
     client = TaskClient(task_id)
     aggregation_interval = config.get("aggregation_interval", "minute")
@@ -116,7 +117,8 @@ def run_process_prices(task_id: Optional[str] = None, config_json: Optional[str]
         raise ValueError("end_date 不能早于 start_date")
 
     client.update_status(
-        "running", f"开始聚合 {start_dt.date()} - {end_dt.date()} 数据，粒度 {aggregation_interval}"
+        "running",
+        f"开始聚合 {start_dt.date()} - {end_dt.date()} 数据，粒度 {aggregation_interval}",
     )
 
     conn = _build_db_conn(db_overrides)
@@ -144,7 +146,9 @@ def run_process_prices(task_id: Optional[str] = None, config_json: Optional[str]
                 cur.execute(SQL_TEMPLATE, params)
                 rows = cur.fetchall()
                 if rows:
-                    day_df = pd.DataFrame(rows, columns=["time_bucket", "source", "average_price"])
+                    day_df = pd.DataFrame(
+                        rows, columns=["time_bucket", "source", "average_price"]
+                    )
                     all_days_dfs.append(day_df)
             except Exception as exc:
                 logger.warning("处理 %s 发生错误: %s", day_start.date(), exc)

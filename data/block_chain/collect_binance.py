@@ -10,9 +10,8 @@ import pandas as pd
 import psycopg2
 import yaml
 from loguru import logger
-from tqdm import tqdm
-
 from task_client import TaskClient, load_config_from_string
+from tqdm import tqdm
 
 # 默认配置
 with open("config/config.yaml", "r", encoding="utf-8") as file:
@@ -45,7 +44,9 @@ def count_lines(filepath: str) -> Optional[int]:
         start_time = time.time()
         count = sum(1 for _ in open(filepath, "rb"))
         end_time = time.time()
-        logger.info("估算完成，共约 %s 行数据，耗时 %.2f 秒。", count, end_time-start_time)
+        logger.info(
+            "估算完成，共约 %s 行数据，耗时 %.2f 秒。", count, end_time - start_time
+        )
         return count
     except FileNotFoundError:
         logger.error("找不到CSV文件 '%s'。请检查路径是否正确。", filepath)
@@ -82,7 +83,9 @@ def process_chunk(
         },
         inplace=True,
     )
-    chunk["trade_time"] = pd.to_datetime(chunk["trade_time"], unit="us", utc=True, errors="coerce")
+    chunk["trade_time"] = pd.to_datetime(
+        chunk["trade_time"], unit="us", utc=True, errors="coerce"
+    )
     chunk.dropna(subset=["trade_time"], inplace=True)
     if chunk.empty:
         rows_counter[0] += original_chunk_len
@@ -125,7 +128,11 @@ def import_data_to_database(
     """
     描述：主导入逻辑：读取CSV，分块处理并写入数据库。
     """
-    pbar_total = target_rows if target_rows is not None and import_percentage < 100 else total_lines
+    pbar_total = (
+        target_rows
+        if target_rows is not None and import_percentage < 100
+        else total_lines
+    )
     pbar_unit = "行" if pbar_total is not None else "块"
     pbar = tqdm(total=pbar_total, unit=pbar_unit, desc="导入进度")
     rows_counter = [0, 0]
@@ -156,7 +163,9 @@ def import_data_to_database(
                 pbar_unit,
             )
             if stop_flag and not should_stop:
-                logger.info("已处理约 %s 行，达到目标 %s 行。", rows_counter[0], target_rows)
+                logger.info(
+                    "已处理约 %s 行，达到目标 %s 行。", rows_counter[0], target_rows
+                )
                 should_stop = True
                 break
     except FileNotFoundError:
@@ -169,7 +178,9 @@ def import_data_to_database(
     return rows_counter
 
 
-def _calc_target_rows(total_lines: Optional[int], import_percentage: float) -> Optional[int]:
+def _calc_target_rows(
+    total_lines: Optional[int], import_percentage: float
+) -> Optional[int]:
     if total_lines is None:
         return None
     if import_percentage >= 100:
@@ -189,11 +200,15 @@ def _build_db_conn(overrides: dict[str, Any]):
     )
 
 
-def run_collect_binance(task_id: Optional[str] = None, config_json: Optional[str] = None):
+def run_collect_binance(
+    task_id: Optional[str] = None, config_json: Optional[str] = None
+):
     config = load_config_from_string(config_json)
     client = TaskClient(task_id)
     csv_path = config.get("csv_path", DEFAULT_CSV_FILE_PATH)
-    import_percentage = float(config.get("import_percentage", DEFAULT_IMPORT_PERCENTAGE))
+    import_percentage = float(
+        config.get("import_percentage", DEFAULT_IMPORT_PERCENTAGE)
+    )
     chunk_size = int(config.get("chunk_size", DEFAULT_CHUNK_SIZE))
     table_name = config.get("table_name", "binance_trades")
 
@@ -236,7 +251,9 @@ def run_collect_binance(task_id: Optional[str] = None, config_json: Optional[str
         rows_imported = rows_counter[1]
         msg = f"成功导入 {rows_imported} 行，耗时 {total_time:.2f}s"
         logger.info(msg)
-        client.update_status("success", msg, {"rows": rows_imported, "duration": total_time})
+        client.update_status(
+            "success", msg, {"rows": rows_imported, "duration": total_time}
+        )
     except Exception as exc:
         client.update_status("failed", f"导入失败: {exc}")
         raise

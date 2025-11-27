@@ -9,7 +9,6 @@ import requests
 import yaml
 from loguru import logger
 from psycopg2.extras import execute_values
-
 from task_client import TaskClient, load_config_from_string
 
 with open("config/config.yaml", "r", encoding="utf-8") as file:
@@ -19,7 +18,9 @@ DEFAULT_DB_CONFIG = _CONFIG.get("db", {})
 DEFAULT_GRAPH_CONFIG = _CONFIG.get("the_graph", {})
 
 
-def fetch_all_swaps(graph_api_url: str, api_key: str, pool_address: str, start_ts: int, end_ts: int):
+def fetch_all_swaps(
+    graph_api_url: str, api_key: str, pool_address: str, start_ts: int, end_ts: int
+):
     """
     描述：通过分页获取指定时间范围内的所有Swap数据。
     参数：
@@ -60,9 +61,13 @@ def fetch_all_swaps(graph_api_url: str, api_key: str, pool_address: str, start_t
         "Content-Type": "application/json",
     }
     while True:
-        query = query_template.format(pool=pool_address, start=start_ts, end=end_ts, last_id=last_id)
+        query = query_template.format(
+            pool=pool_address, start=start_ts, end=end_ts, last_id=last_id
+        )
         try:
-            response = requests.post(graph_api_url, json={"query": query}, headers=headers, timeout=30)
+            response = requests.post(
+                graph_api_url, json={"query": query}, headers=headers, timeout=30
+            )
             response.raise_for_status()
             swaps = response.json()["data"]["swaps"]
         except (requests.exceptions.RequestException, KeyError) as exc:
@@ -97,7 +102,9 @@ def process_and_store_uniswap_data(swaps_data: Iterable[dict[str, Any]], conn) -
         price = abs(amount1 / amount0)
         records.append(
             (
-                pd.to_datetime(pd.to_numeric(s["timestamp"], errors="coerce"), unit="s", utc=True).to_pydatetime(),
+                pd.to_datetime(
+                    pd.to_numeric(s["timestamp"], errors="coerce"), unit="s", utc=True
+                ).to_pydatetime(),
                 price,
                 amount0,
                 amount1,
@@ -139,7 +146,9 @@ def _iter_days(start: datetime, end: datetime):
         cursor += timedelta(days=1)
 
 
-def run_collect_uniswap(task_id: Optional[str] = None, config_json: Optional[str] = None):
+def run_collect_uniswap(
+    task_id: Optional[str] = None, config_json: Optional[str] = None
+):
     config = load_config_from_string(config_json)
     client = TaskClient(task_id)
     graph_cfg = DEFAULT_GRAPH_CONFIG.copy()
@@ -159,7 +168,9 @@ def run_collect_uniswap(task_id: Optional[str] = None, config_json: Optional[str
     if end_dt < start_dt:
         raise ValueError("end_date 必须不早于 start_date")
 
-    client.update_status("running", f"开始抓取 {start_dt.date()} - {end_dt.date()} 的 Uniswap 数据")
+    client.update_status(
+        "running", f"开始抓取 {start_dt.date()} - {end_dt.date()} 的 Uniswap 数据"
+    )
 
     conn = _build_db_conn(config.get("db", {}))
     total_written = 0
@@ -181,7 +192,11 @@ def run_collect_uniswap(task_id: Optional[str] = None, config_json: Optional[str
         client.update_status("failed", f"抓取失败: {exc}")
         raise
     else:
-        client.update_status("success", f"抓取完成，共写入 {total_written} 条记录", {"rows": total_written})
+        client.update_status(
+            "success",
+            f"抓取完成，共写入 {total_written} 条记录",
+            {"rows": total_written},
+        )
     finally:
         conn.close()
 

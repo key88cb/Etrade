@@ -6,7 +6,6 @@ import psycopg2
 import yaml
 from loguru import logger
 from psycopg2.extras import Json, execute_values
-
 from task_client import TaskClient, load_config_from_string
 
 # 默认策略参数
@@ -121,7 +120,9 @@ def fetch_price_pairs(
     return price_pairs
 
 
-def calculate_profit_buy_cex_sell_dex(strategy: dict[str, Any], price_cex, price_dex, gas_price):
+def calculate_profit_buy_cex_sell_dex(
+    strategy: dict[str, Any], price_cex, price_dex, gas_price
+):
     investment = strategy["initial_investment"]
     binance_fee = strategy["binance_fee_rate"]
     uniswap_fee = strategy["uniswap_fee_rate"]
@@ -139,7 +140,9 @@ def calculate_profit_buy_cex_sell_dex(strategy: dict[str, Any], price_cex, price
     return net_profit
 
 
-def calculate_profit_buy_dex_sell_cex(strategy: dict[str, Any], price_dex, price_cex, gas_price):
+def calculate_profit_buy_dex_sell_cex(
+    strategy: dict[str, Any], price_dex, price_cex, gas_price
+):
     investment = strategy["initial_investment"]
     binance_fee = strategy["binance_fee_rate"]
     uniswap_fee = strategy["uniswap_fee_rate"]
@@ -174,7 +177,9 @@ def analyze_opportunities(price_pairs: list, strategy: dict[str, Any]):
             continue
 
         if uniswap_price > binance_price and binance_price != 0:
-            profit = calculate_profit_buy_cex_sell_dex(strategy, binance_price, uniswap_price, gas_price)
+            profit = calculate_profit_buy_cex_sell_dex(
+                strategy, binance_price, uniswap_price, gas_price
+            )
             if profit > threshold:
                 profitable_trades.append(
                     {
@@ -187,7 +192,9 @@ def analyze_opportunities(price_pairs: list, strategy: dict[str, Any]):
                     }
                 )
         elif binance_price > uniswap_price and uniswap_price != 0:
-            profit = calculate_profit_buy_dex_sell_cex(strategy, uniswap_price, binance_price, gas_price)
+            profit = calculate_profit_buy_dex_sell_cex(
+                strategy, uniswap_price, binance_price, gas_price
+            )
             if profit > threshold:
                 profitable_trades.append(
                     {
@@ -231,7 +238,9 @@ def save_results(
             )
         elif not append:
             logger.info("清理批次 %s 旧数据", batch_id)
-            cur.execute("DELETE FROM arbitrage_opportunities WHERE batch_id = %s", (batch_id,))
+            cur.execute(
+                "DELETE FROM arbitrage_opportunities WHERE batch_id = %s", (batch_id,)
+            )
 
         if not results:
             conn.commit()
@@ -242,7 +251,9 @@ def save_results(
         records = []
         for item in results:
             details = {
-                "block_time": item["block_time"].isoformat() if item.get("block_time") else None,
+                "block_time": (
+                    item["block_time"].isoformat() if item.get("block_time") else None
+                ),
                 "experiment_id": experiment_id,
             }
             records.append(
@@ -289,7 +300,9 @@ def run_analyse(task_id: Optional[str] = None, config_json: Optional[str] = None
     try:
         price_pairs = fetch_price_pairs(conn, strategy, start_ts, end_ts)
         opportunities = analyze_opportunities(price_pairs, strategy)
-        save_results(conn, opportunities, batch_id, append, rebuild_table, experiment_id)
+        save_results(
+            conn, opportunities, batch_id, append, rebuild_table, experiment_id
+        )
     except Exception as exc:
         conn.rollback()
         client.update_status("failed", f"分析失败: {exc}")

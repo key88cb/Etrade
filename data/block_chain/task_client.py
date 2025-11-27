@@ -22,7 +22,9 @@ class TaskClient:
         self.task_id = task_id or "local-run"
         self._lock = threading.Lock()
 
-    def update_status(self, status: str, message: Optional[str] = None, payload: Optional[dict] = None) -> None:
+    def update_status(
+        self, status: str, message: Optional[str] = None, payload: Optional[dict] = None
+    ) -> None:
         entry = {
             "task_id": self.task_id,
             "status": status,

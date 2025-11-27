@@ -10,7 +10,7 @@ import pandas as pd
 import psycopg2
 import yaml
 from loguru import logger
-from task_client import TaskClient, load_config_from_string
+from .task_client import TaskClient, load_config_from_string
 from tqdm import tqdm
 
 # 默认配置

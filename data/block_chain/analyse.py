@@ -6,7 +6,7 @@ import psycopg2
 import yaml
 from loguru import logger
 from psycopg2.extras import Json, execute_values
-from task_client import TaskClient, load_config_from_string
+from .task_client import TaskClient, load_config_from_string
 
 # 默认策略参数
 DEFAULT_STRATEGY = {

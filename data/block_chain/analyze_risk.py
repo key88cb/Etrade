@@ -7,7 +7,7 @@ Risk analysis placeholder.
 import argparse
 from typing import Optional
 
-from task_client import TaskClient, load_config_from_string
+from .task_client import TaskClient, load_config_from_string
 
 
 def run_analyze_risk(task_id: Optional[str] = None, config_json: Optional[str] = None):

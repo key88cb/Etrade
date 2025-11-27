@@ -30,7 +30,15 @@ type Handler struct {
 }
 
 func NewHandler() *Handler {
-	return &Handler{service: service.NewService(db.GetDB())}
+	return NewHandlerWithService(service.NewService(db.GetDB()))
+}
+
+// NewHandlerWithService allows injecting a pre-configured service (used in tests).
+func NewHandlerWithService(s *service.Service) *Handler {
+	if s == nil {
+		panic("service is required")
+	}
+	return &Handler{service: s}
 }
 
 // GetOpportunities

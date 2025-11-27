@@ -42,6 +42,13 @@ func InitDB() error {
 
 	// 自动迁移数据库表
 	err = database.AutoMigrate(
+		&models.Task{},
+		&models.TaskLog{},
+		&models.ParamTemplate{},
+		&models.Batch{},
+		&models.Report{},
+		&models.Experiment{},
+		&models.ExperimentRun{},
 		&models.ArbitrageOpportunity{},
 		&models.BinanceTrade{},
 		&models.UniswapSwap{},

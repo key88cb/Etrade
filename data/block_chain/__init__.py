@@ -1,3 +1,21 @@
 """
-暂时没有任何导入初始化操作
+block_chain 包导出核心任务模块，便于 `import block_chain.process_prices` 等写法。
 """
+
+from . import (
+    analyse,
+    analyze_risk,
+    collect_binance,
+    collect_uniswap,
+    process_prices,
+    task_client,
+)
+
+__all__ = [
+    "analyse",
+    "analyze_risk",
+    "collect_binance",
+    "collect_uniswap",
+    "process_prices",
+    "task_client",
+]

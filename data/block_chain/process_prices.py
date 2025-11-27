@@ -8,8 +8,9 @@ import psycopg2
 import yaml
 from loguru import logger
 from psycopg2.extras import execute_values
-from task_client import TaskClient, load_config_from_string
 from tqdm import tqdm
+
+from task_client import TaskClient, load_config_from_string
 
 with open("config/config.yaml", "r", encoding="utf-8") as file:
     _CONFIG = yaml.safe_load(file)

@@ -9,11 +9,13 @@ require (
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.1
 	github.com/swaggo/swag v1.16.6
+	gorm.io/datatypes v1.2.7
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.0
 )
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic v1.14.2 // indirect
@@ -35,9 +37,11 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.28.0 // indirect
+	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.7.6 // indirect
@@ -72,4 +76,5 @@ require (
 	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/tools v0.39.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
+	gorm.io/driver/mysql v1.5.6 // indirect
 )

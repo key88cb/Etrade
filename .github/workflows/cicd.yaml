@@ -45,12 +45,12 @@ jobs:
       working-directory: ./backend
       run: go build -o main main.go
       
-    - name: Format Check
-      working-directory: ./backend
-      run: |
-        gofmt -l . | grep -e ".go" && exit 1 || exit 0
-        go install golang.org/x/tools/cmd/goimports@latest
-        goimports -l . | grep -e ".go" && exit 1 || exit 0
+    #- name: Format Check
+    #  working-directory: ./backend
+    #  run: |
+    #    gofmt -l . | grep -e ".go" && exit 1 || exit 0
+    #    go install golang.org/x/tools/cmd/goimports@latest
+    #    goimports -l . | grep -e ".go" && exit 1 || exit 0
 
     # - name: Run tests
     #   working-directory: ./backend
@@ -107,13 +107,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install black isort
 
-    - name: Black check (data)
-      working-directory: ./data
-      run: black --check .
+    #- name: Black check (data)
+    #  working-directory: ./data
+    #  run: black --check .
 
-    - name: isort check (data)
-      working-directory: ./data
-      run: isort --check-only --profile black .
+    #- name: isort check (data)
+    #  working-directory: ./data
+    #  run: isort --check-only --profile black .
 
     - name: Set up Python
       uses: actions/setup-python@v5

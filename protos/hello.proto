@@ -1,0 +1,17 @@
+// 指定 Protobuf 语法版本
+syntax = "proto3";
+
+// 定义消息结构
+message HelloRequest {
+  string name = 1;
+}
+
+message HelloReply {
+  string message = 1;
+}
+
+// 定义服务接口
+service Greeter {
+  // 定义一个简单 RPC 方法 (一元调用)
+  rpc SayHello (HelloRequest) returns (HelloReply);
+}

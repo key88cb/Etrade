@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package task.v1;
+
+// TaskService 定义了任务执行与管理的 RPC 接口。
+service TaskService {
+  // RunTask 提交并启动一个新任务。
+  rpc RunTask(RunTaskRequest) returns (RunTaskResponse);
+
+  // StreamLogs 通过服务器流式 RPC 实时推送特定任务的执行日志。
+  rpc StreamLogs(TaskLogRequest) returns (stream TaskLog);
+
+  // CancelTask 尝试取消一个正在执行或排队中的任务。
+  rpc CancelTask(CancelRequest) returns (CancelResponse);
+}
+
+// TaskStatus 定义任务的可能状态。
+enum TaskStatus {
+  TASK_STATUS_UNSPECIFIED = 0; // 未指定，通常用于初始化或错误检查
+  TASK_STATUS_QUEUED = 1;      // 任务已进入队列等待执行
+  TASK_STATUS_RUNNING = 2;     // 任务正在执行中
+  TASK_STATUS_SUCCESS = 3;     // 任务成功完成
+  TASK_STATUS_FAILED = 4;      // 任务执行失败
+  TASK_STATUS_CANCELED = 5;    // 任务被取消
+}
+
+// RunTaskRequest 提交任务所需的所有参数。
+message RunTaskRequest {
+  string task_id = 1;         // 任务的唯一标识符
+  string task_type = 2;       // 任务类型 (e.g., "DATA_IMPORT", "REPORT_GEN")
+  string config_json = 3;     // 任务配置，JSON 格式字符串
+  string batch_id = 4;        // 批次/分组标识
+  string experiment_id = 5;   // 实验标识
+  string trigger = 6;         // 触发方式/来源 (e.g., "MANUAL", "CRON", "API")
+}
+
+// RunTaskResponse 包含任务执行结果的摘要。
+message RunTaskResponse {
+  TaskStatus status = 1;      // 任务的最终状态
+  double duration_sec = 2;    // 执行时长 (秒)
+  string log_summary = 3;     // 关键日志摘要
+  
+  // 输出指标，使用 Map 来存储键值对，例如：
+  // "imported_rows": "1000",
+  // "report_file_path": "/path/to/report.pdf"
+  map<string, string> output_metrics = 4; 
+}
+
+// TaskLogRequest 客户端请求特定任务的日志流。
+message TaskLogRequest {
+  string task_id = 1;
+}
+
+// TaskLog 包含单个日志消息。
+message TaskLog {
+  string timestamp = 1;   // 日志时间戳
+  string level = 2;       // 日志级别 (e.g., "INFO", "WARN", "ERROR")
+  string message = 3;     // 日志内容
+}
+
+// CancelRequest 包含要取消的任务ID。
+message CancelRequest {
+  string task_id = 1;
+}
+
+// CancelResponse 反馈取消操作的结果。
+message CancelResponse {
+  bool success = 1; // 是否成功提交了取消请求（不代表任务已立即终止）
+  string message = 2; // 额外的说明信息
+}

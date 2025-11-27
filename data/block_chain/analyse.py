@@ -46,7 +46,9 @@ def _parse_timestamp(value: Optional[str]) -> Optional[pd.Timestamp]:
     return pd.to_datetime(value, utc=True, errors="raise")
 
 
-def parse_cli_args(argv: Optional[list[str]] = None) -> Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp]]:
+def parse_cli_args(
+    argv: Optional[list[str]] = None,
+) -> Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp]]:
     """
     描述：解析命令行参数，返回起止时间戳
     参数：argv: 自定义参数列表，测试时可注入；默认读取 sys.argv
@@ -56,8 +58,12 @@ def parse_cli_args(argv: Optional[list[str]] = None) -> Tuple[Optional[pd.Timest
         description="从数据库中筛选指定时间范围的交易数据并执行套利分析。",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--start", type=str, help="起始时间 (ISO8601，如 2025-09-01T00:00:00Z)")
-    parser.add_argument("--end", type=str, help="结束时间 (ISO8601，如 2025-09-07T23:59:59Z)")
+    parser.add_argument(
+        "--start", type=str, help="起始时间 (ISO8601，如 2025-09-01T00:00:00Z)"
+    )
+    parser.add_argument(
+        "--end", type=str, help="结束时间 (ISO8601，如 2025-09-07T23:59:59Z)"
+    )
     args = parser.parse_args(argv)
 
     start_ts = _parse_timestamp(args.start)

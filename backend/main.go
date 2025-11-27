@@ -6,7 +6,8 @@ import (
 	"backend/db"
 	"log"
 
-	docs "backend/docs"                        // 导入 swag 生成的 docs
+	docs "backend/docs" // 导入 swag 生成的 docs
+
 	swaggerFiles "github.com/swaggo/files"     // 导入 swaggerFiles
 	ginSwagger "github.com/swaggo/gin-swagger" // 导入 ginSwagger
 )

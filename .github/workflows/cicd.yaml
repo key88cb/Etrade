@@ -2,9 +2,9 @@ name: Etrade CICD
 
 on:
   push:
-    branches: [ master, develop ]
+    branches: [ master, develop, 'dev_*' ]
   pull_request:
-    branches: [ master, develop ]
+    branches: [ master, develop, 'dev_*' ]
 
 jobs:
   backend-ci:
@@ -52,6 +52,24 @@ jobs:
         go install golang.org/x/tools/cmd/goimports@latest
         goimports -l . | grep -e ".go" && exit 1 || exit 0
 
+    # - name: Run tests
+    #   working-directory: ./backend
+    #   run: |
+    #     go test -coverpkg=./models,./service -v -cover -coverprofile=coverage.out ./test/...
+
+    # - name: Generate HTML report
+    #   working-directory: ./backend
+    #   run: |
+    #     go tool cover -html=coverage.out -o coverage.html
+
+    # - name: Upload coverage report
+    #   uses: actions/upload-artifact@v4
+    #   if: always()
+    #   with:
+    #     name: coverage-report-backend
+    #     path: backend/coverage.html
+    #     retention-days: 30
+
   frontend-ci:
     runs-on: ubuntu-latest
     steps:
@@ -72,7 +90,7 @@ jobs:
       working-directory: ./frontend
       run: npm run build
 
-  data-lint:
+  data-ci:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -95,4 +113,30 @@ jobs:
 
     - name: isort check (data)
       working-directory: ./data
-      run: isort --check-only .
+      run: isort --check-only --profile black .
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+        cache-dependency-path: ./data/requirements.txt
+
+    - name: Install dependencies
+      working-directory: ./data
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run pytest with coverage
+      working-directory: ./data
+      run: |
+        pytest --cov=block_chain --cov-report=html --cov-report=term --cov-report=xml -v test/
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-report-data
+        path: data/htmlcov/
+        retention-days: 30

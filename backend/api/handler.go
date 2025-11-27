@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv" // 导入 strconv
 
+	"backend/db"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -28,7 +30,7 @@ type Handler struct {
 }
 
 func NewHandler() *Handler {
-	return &Handler{service: service.NewService()}
+	return &Handler{service: service.NewService(db.GetDB())}
 }
 
 // GetOpportunities

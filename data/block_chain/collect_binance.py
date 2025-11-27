@@ -14,14 +14,20 @@ from tqdm import tqdm
 CSV_FILE_PATH = r"./ETHUSDT-trades-2025-09.csv"
 
 # 从配置文件加载数据库配置
-with open("config/config.yaml", "r", encoding="utf-8") as file:
-    config = yaml.safe_load(file)
+import os
 
-HOST = config["db"]["host"]
-PORT = config["db"]["port"]
-DATABASE = config["db"]["database"]
-USERNAME = config["db"]["username"]
-PASSWORD = config["db"]["password"]
+_config_path = os.path.join(os.path.dirname(__file__), "..", "config", "config.yaml")
+try:
+    with open(_config_path, "r", encoding="utf-8") as file:
+        config = yaml.safe_load(file)
+    HOST = config["db"]["host"]
+    PORT = config["db"]["port"]
+    DATABASE = config["db"]["database"]
+    USERNAME = config["db"]["username"]
+    PASSWORD = config["db"]["password"]
+except FileNotFoundError:
+    # 如果配置文件不存在（例如在测试环境中），使用默认值
+    HOST = PORT = DATABASE = USERNAME = PASSWORD = None
 
 # 导入比例
 IMPORT_PERCENTAGE = 1  # 整个6G的文件一共有1亿行
@@ -88,6 +94,13 @@ def process_chunk(
     original_chunk_len = len(chunk_data)
     # 数据预处理
     chunk = chunk_data.copy()
+    # 如果chunk为空，直接返回
+    if chunk.empty:
+        rows_counter[0] += original_chunk_len
+        pbar.update(original_chunk_len if pbar_unit == "行" else 1)
+        should_stop = target_rows is not None and rows_counter[0] >= target_rows
+        return (True, original_chunk_len, 0, should_stop)
+
     chunk.rename(
         columns={
             "time": "trade_time",

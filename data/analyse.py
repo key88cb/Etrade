@@ -52,8 +52,6 @@ def fetch_price_pairs(
     start_time: Optional[pd.Timestamp] = None,
     end_time: Optional[pd.Timestamp] = None,
 ) -> list[Tuple]:
-    start_time: Optional[pd.Timestamp] = None, end_time: Optional[pd.Timestamp] = None
-) -> list:
     """
     使用单个 SQL JOIN 查询，让数据库服务器完成所有繁重的计算.
     """
@@ -71,18 +69,6 @@ def fetch_price_pairs(
         time_conditions.append("u.block_time <= %(end_ts)s")
     where_clause = f"WHERE {' AND '.join(time_conditions)}" if time_conditions else ""
 
-    # 如果没有时间范围，则删除键以避免SQL错误
-    if not time_conditions:
-        if "start_ts" in params:
-            del params["start_ts"]
-        if "end_ts" in params:
-            del params["end_ts"]
-
-    where_clause = f"WHERE {' AND '.join(time_conditions)}" if time_conditions else ""
-
-    # 3. 终极 SQL 查询
-    # 使用 CTEs (Common Table Expressions) 来提高可读性
-    # 并使用 JOIN ... GROUP BY 来计算币安的平均价格
     sql_query = f"""
         WITH 
         config AS (
@@ -104,7 +90,7 @@ def fetch_price_pairs(
                 AVG(b.price) AS binance_price
             FROM 
                 uniswap_data u
-            CROSS JOIN
+            CROSS JOIN 
                 config c 
             JOIN 
                 binance_trades b 
@@ -324,19 +310,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-    # 2. 执行分析 (现在在纯 Python 内存中进行)
-    opportunities = analyze_opportunities(price_pairs_list)
-
-    # 3. 保存结果
-    save_results(opportunities)
-
-    # 4. 清理连接
-    try:
-        cur.close()
-    except Exception:
-        pass
-    try:
-        conn.close()
-    except Exception:
-        pass

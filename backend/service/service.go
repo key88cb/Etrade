@@ -16,6 +16,11 @@ func NewService(db *gorm.DB) *Service {
 	return &Service{db: db}
 }
 
+// DB exposes the underlying connection for test setup.
+func (s *Service) DB() *gorm.DB {
+	return s.db
+}
+
 // 添加了分页和排序参数
 func (s *Service) GetOpportunities(page, limit int, sortBy, order string) ([]models.ArbitrageOpportunity, *models.PaginationData, error) {
 	var opportunities []models.ArbitrageOpportunity
@@ -50,8 +55,8 @@ func (s *Service) GetPriceComparisonData(startTime, endTime int64) (map[string][
 	var results []models.AggregatedPrice
 
 	// 将毫秒时间戳转换为 time.Time
-	start := time.UnixMilli(startTime)
-	end := time.UnixMilli(endTime)
+	start := time.UnixMilli(startTime).UTC()
+	end := time.UnixMilli(endTime).UTC()
 
 	// 1. 从 service 层访问数据库, 添加 WHERE 条件
 	if err := s.db.

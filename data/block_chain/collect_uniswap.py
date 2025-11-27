@@ -1,7 +1,7 @@
-import os
-import threading
+import argparse
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from typing import Any, Iterable, Optional
 
 import pandas as pd
 import psycopg2
@@ -10,172 +10,189 @@ import yaml
 from loguru import logger
 from psycopg2.extras import execute_values
 
-# 从配置文件加载配置
-_config_path = os.path.join(os.path.dirname(__file__), "..", "config", "config.yaml")
-try:
-    with open(_config_path, "r", encoding="utf-8") as file:
-        config = yaml.safe_load(file)
-    API_KEY = config["the_graph"]["api_key"]
-    GRAPH_API_URL = config["the_graph"]["graph_api_url"]
-    POOL_ADDRESS = config["the_graph"]["uniswap_pool_address"]
-    HOST = config["db"]["host"]
-    PORT = config["db"]["port"]
-    DATABASE = config["db"]["database"]
-    USERNAME = config["db"]["username"]
-    PASSWORD = config["db"]["password"]
-    DB_CONNECTION_STRING = (
-        f"postgresql://{USERNAME}:{PASSWORD}@{HOST}:{PORT}/{DATABASE}"
-    )
-except FileNotFoundError:
-    # 如果配置文件不存在（例如在测试环境中），使用默认值
-    API_KEY = GRAPH_API_URL = POOL_ADDRESS = None
-    HOST = PORT = DATABASE = USERNAME = PASSWORD = None
-    DB_CONNECTION_STRING = None
+from task_client import TaskClient, load_config_from_string
+
+with open("config/config.yaml", "r", encoding="utf-8") as file:
+    _CONFIG = yaml.safe_load(file)
+
+DEFAULT_DB_CONFIG = _CONFIG.get("db", {})
+DEFAULT_GRAPH_CONFIG = _CONFIG.get("the_graph", {})
 
 
-def fetch_all_swaps(pool_address, start_ts, end_ts):
+def fetch_all_swaps(graph_api_url: str, api_key: str, pool_address: str, start_ts: int, end_ts: int):
     """
     描述：通过分页获取指定时间范围内的所有Swap数据。
     参数：
         pool_address：池地址
         start_ts：起始时间的Unix时间戳（秒级）
-        end_ts：终止时间的Uninx时间戳（秒级）
+        end_ts：终止时间的Unix时间戳（秒级）
     返回值：获取到的uniswap数据
     """
     all_swaps = []
-    last_id = ""  # 使用 last_id 进行分页，更稳定
-    logger.info(f"开始从 The Graph 获取 Uniswap 数据...")
+    last_id = ""
+    logger.info("开始从 The Graph 获取 Uniswap 数据，范围 %s - %s", start_ts, end_ts)
+    query_template = """
+    query GetRecentSwaps {{
+      swaps(
+        first: 1000,
+        orderBy: id
+        orderDirection: asc
+        where: {{
+          pool: "{pool}"
+          timestamp_gte: {start}
+          timestamp_lte: {end}
+          id_gt: "{last_id}"
+        }}
+      ) {{
+        id
+        timestamp
+        amount0
+        amount1
+        transaction {{
+          id
+          gasPrice
+        }}
+      }}
+    }}
+    """
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
     while True:
-        # id_gt 表示获取 id 大于 last_id 的记录
-        # graphQL api 是fb的新范式 会直接返回对应名字的数据 可以把下面的查询当做一个空json
-        query = """
-        query GetRecentSwaps {
-        swaps(
-            first: 1000,
-            orderBy: id
-            orderDirection: asc
-            where: {
-            pool: "0x%lx"
-            timestamp_gte: %d
-            timestamp_lte: %d
-            id_gt: "%s"
-            }
-        ) {
-            id
-            timestamp
-            amount0
-            amount1
-            transaction {
-            id
-            gasPrice
-            }
-        }
-        }
-        """ % (
-            POOL_ADDRESS,
-            start_ts,
-            end_ts,
-            last_id,
-        )
-
+        query = query_template.format(pool=pool_address, start=start_ts, end=end_ts, last_id=last_id)
         try:
-            headers = {
-                "Authorization": f"Bearer {API_KEY}",
-                "Content-Type": "application/json",
-            }
-            response = requests.post(
-                GRAPH_API_URL, json={"query": query}, headers=headers
-            )
-            response.raise_for_status()  # 如果请求失败则抛出异常
+            response = requests.post(graph_api_url, json={"query": query}, headers=headers, timeout=30)
+            response.raise_for_status()
             swaps = response.json()["data"]["swaps"]
-        except Exception as e:
-            logger.info(f"请求失败: {e}。5秒后重试...")
-            if "response" in locals():
-                logger.error(f"请求失败: {response.text}")
+        except (requests.exceptions.RequestException, KeyError) as exc:
+            logger.warning("请求失败: %s，5秒后重试...", exc)
             time.sleep(5)
             continue
-
         if not swaps:
             break
-
         all_swaps.extend(swaps)
         last_id = swaps[-1]["id"]
-        logger.info(f"last id = {last_id}")
-        logger.info(f"已获取 {len(all_swaps)} 条记录...")
-        time.sleep(1)
+        logger.info("目前累计获取 %s 条记录...", len(all_swaps))
     return all_swaps
 
 
-def process_and_store_uniswap_data(swaps_data, conn):
+def process_and_store_uniswap_data(swaps_data: Iterable[dict[str, Any]], conn) -> int:
     """
     描述：处理数据并存入数据库。
-    参数：
-        swaps_data：爬取到的 swap 数据
-        conn：数据库连接
+    返回值：写入的记录数量
     """
-    if not swaps_data:
-        logger.info("没有获取到Uniswap数据。")
-        return
+    swaps = list(swaps_data)
+    if not swaps:
+        logger.info("没有获取到 Uniswap 数据。")
+        return 0
 
-    logger.info("正在处理Uniswap数据...")
+    logger.info("正在处理 %s 条 Uniswap 数据...", len(swaps))
     records = []
-    for s in swaps_data:
+    for s in swaps:
         amount0 = float(s["amount0"])
         amount1 = float(s["amount1"])
         if amount0 == 0:
-            continue  # 避免除以零错误
+            continue
         price = abs(amount1 / amount0)
         records.append(
-            {
-                "block_time": pd.to_datetime(
-                    pd.to_numeric(s["timestamp"], errors="coerce"), unit="s", utc=True
-                ),
-                "price": price,
-                "amount_eth": amount0,  # WETH是token0
-                "amount_usdt": amount1,
-                "gas_price": int(s["transaction"]["gasPrice"]),
-                "tx_hash": s["transaction"]["id"],
-            }
-        )
-    logger.info(f"正在将 {len(records)} 条Uniswap记录存入数据库...")
-    with conn:
-        with conn.cursor() as cur:
-            insert_sql = (
-                "INSERT INTO uniswap_swaps (block_time, price, amount_eth, amount_usdt, gas_price, tx_hash) "
-                "VALUES %s"
+            (
+                pd.to_datetime(pd.to_numeric(s["timestamp"], errors="coerce"), unit="s", utc=True).to_pydatetime(),
+                price,
+                amount0,
+                amount1,
+                int(s["transaction"]["gasPrice"]),
+                s["transaction"]["id"],
             )
-            values = [
-                (
-                    r["block_time"].to_pydatetime(),
-                    r["price"],
-                    r["amount_eth"],
-                    r["amount_usdt"],
-                    r["gas_price"],
-                    r["tx_hash"],
-                )
-                for r in records
-            ]
-            if values:
-                execute_values(cur, insert_sql, values, page_size=1000)
-    logger.info("Uniswap数据存储成功！")
+        )
+
+    if not records:
+        logger.info("没有可写入的数据。")
+        return 0
+
+    with conn, conn.cursor() as cur:
+        insert_sql = """
+        INSERT INTO uniswap_swaps (block_time, price, amount_eth, amount_usdt, gas_price, tx_hash)
+        VALUES %s
+        """
+        execute_values(cur, insert_sql, records, page_size=1000)
+    logger.info("成功写入 %s 条 Uniswap 记录。", len(records))
+    return len(records)
+
+
+def _build_db_conn(overrides: dict[str, Any]):
+    cfg = DEFAULT_DB_CONFIG.copy()
+    cfg.update(overrides or {})
+    return psycopg2.connect(
+        dbname=cfg.get("database"),
+        user=cfg.get("username"),
+        password=cfg.get("password"),
+        host=cfg.get("host"),
+        port=cfg.get("port"),
+    )
+
+
+def _iter_days(start: datetime, end: datetime):
+    cursor = start
+    while cursor <= end:
+        yield cursor
+        cursor += timedelta(days=1)
+
+
+def run_collect_uniswap(task_id: Optional[str] = None, config_json: Optional[str] = None):
+    config = load_config_from_string(config_json)
+    client = TaskClient(task_id)
+    graph_cfg = DEFAULT_GRAPH_CONFIG.copy()
+    graph_cfg.update(config.get("the_graph", {}))
+
+    start_date = config.get("start_date")
+    end_date = config.get("end_date")
+
+    if start_date:
+        start_dt = datetime.fromisoformat(start_date).astimezone(timezone.utc)
+    else:
+        start_dt = datetime.now(tz=timezone.utc) - timedelta(days=1)
+    if end_date:
+        end_dt = datetime.fromisoformat(end_date).astimezone(timezone.utc)
+    else:
+        end_dt = start_dt
+    if end_dt < start_dt:
+        raise ValueError("end_date 必须不早于 start_date")
+
+    client.update_status("running", f"开始抓取 {start_dt.date()} - {end_dt.date()} 的 Uniswap 数据")
+
+    conn = _build_db_conn(config.get("db", {}))
+    total_written = 0
+    try:
+        for day in _iter_days(start_dt.date(), end_dt.date()):
+            day_start = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
+            day_end = day_start + timedelta(days=1) - timedelta(seconds=1)
+            logger.info("正在处理日期 %s", day_start.date())
+            swaps = fetch_all_swaps(
+                graph_cfg["graph_api_url"],
+                graph_cfg["api_key"],
+                graph_cfg["uniswap_pool_address"],
+                int(day_start.timestamp()),
+                int(day_end.timestamp()),
+            )
+            written = process_and_store_uniswap_data(swaps, conn)
+            total_written += written
+    except Exception as exc:
+        client.update_status("failed", f"抓取失败: {exc}")
+        raise
+    else:
+        client.update_status("success", f"抓取完成，共写入 {total_written} 条记录", {"rows": total_written})
+    finally:
+        conn.close()
+
+
+def main():
+    parser = argparse.ArgumentParser(description="从 The Graph 导入 Uniswap swap 数据")
+    parser.add_argument("--task-id", dest="task_id", help="任务 ID", default=None)
+    parser.add_argument("--config", dest="config", help="JSON 配置", default=None)
+    args = parser.parse_args()
+    run_collect_uniswap(args.task_id, args.config)
 
 
 if __name__ == "__main__":
-    conn = psycopg2.connect(
-        dbname=DATABASE,
-        user=USERNAME,
-        password=PASSWORD,
-        host=HOST,
-        port=PORT,
-    )
-    # 输入时间范围 2025-9-x ~ 2025-9-y
-    for i in range(2, 3):
-        logger.info(f"目前处理到 2025-9-{i}")
-        start_time = datetime(2025, 9, i, 0, 0, 0, tzinfo=timezone.utc)
-        end_time = datetime(2025, 9, i, 23, 59, 59, tzinfo=timezone.utc)
-        all_swaps = fetch_all_swaps(
-            POOL_ADDRESS, start_time.timestamp(), end_time.timestamp()
-        )
-        process_and_store_uniswap_data(all_swaps, conn)
-
-    conn.close()
+    main()

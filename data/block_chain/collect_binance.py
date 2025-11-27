@@ -10,9 +10,8 @@ import pandas as pd
 import psycopg2
 import yaml
 from loguru import logger
-from tqdm import tqdm
-
 from task_client import TaskClient, load_config_from_string
+from tqdm import tqdm
 
 # 默认配置
 with open("config/config.yaml", "r", encoding="utf-8") as file:

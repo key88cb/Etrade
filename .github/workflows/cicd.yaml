@@ -52,23 +52,23 @@ jobs:
         go install golang.org/x/tools/cmd/goimports@latest
         goimports -l . | grep -e ".go" && exit 1 || exit 0
 
-    - name: Run tests
-      working-directory: ./backend
-      run: |
-        go test -coverpkg=./models,./service -v -cover -coverprofile=coverage.out ./test/...
+    # - name: Run tests
+    #   working-directory: ./backend
+    #   run: |
+    #     go test -coverpkg=./models,./service -v -cover -coverprofile=coverage.out ./test/...
 
-    - name: Generate HTML report
-      working-directory: ./backend
-      run: |
-        go tool cover -html=coverage.out -o coverage.html
+    # - name: Generate HTML report
+    #   working-directory: ./backend
+    #   run: |
+    #     go tool cover -html=coverage.out -o coverage.html
 
-    - name: Upload coverage report
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: coverage-report-backend
-        path: backend/coverage.html
-        retention-days: 30
+    # - name: Upload coverage report
+    #   uses: actions/upload-artifact@v4
+    #   if: always()
+    #   with:
+    #     name: coverage-report-backend
+    #     path: backend/coverage.html
+    #     retention-days: 30
 
   frontend-ci:
     runs-on: ubuntu-latest

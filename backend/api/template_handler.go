@@ -1,0 +1,136 @@
+package api
+
+import (
+	"net/http"
+	"strconv"
+
+	"backend/service"
+	"backend/utils"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/datatypes"
+)
+
+type TemplateHandler struct {
+	service *service.TemplateService
+}
+
+func NewTemplateHandler(s *service.TemplateService) *TemplateHandler {
+	return &TemplateHandler{service: s}
+}
+
+// Register 注册模板相关路由
+func (h *TemplateHandler) Register(rg *gin.RouterGroup) {
+	rg.GET("/templates", h.ListTemplates)
+	rg.POST("/templates", h.CreateTemplate)
+	rg.PUT("/templates/:id", h.UpdateTemplate)
+	rg.DELETE("/templates/:id", h.DeleteTemplate)
+}
+
+type templateRequest struct {
+	Name     string                 `json:"name" binding:"required"`
+	TaskType string                 `json:"task_type" binding:"required"`
+	Config   map[string]interface{} `json:"config"`
+}
+
+// TemplateResponse 模板响应
+type TemplateResponse struct {
+	ID       uint                   `json:"id"`
+	Name     string                 `json:"name"`
+	TaskType string                 `json:"task_type"`
+	Config   map[string]interface{} `json:"config"`
+}
+
+// ListTemplates 模板列表
+// @Summary      模板列表
+// @Description  查询所有任务模板
+// @Tags         Template
+// @Produce      json
+// @Success      200  {array}   models.ParamTemplate
+// @Router       /templates [get]
+func (h *TemplateHandler) ListTemplates(c *gin.Context) {
+	templates, err := h.service.ListTemplates(c.Request.Context())
+	if err != nil {
+		utils.Fail(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, templates)
+}
+
+// CreateTemplate 创建模板
+// @Summary      创建模板
+// @Tags         Template
+// @Accept       json
+// @Produce      json
+// @Param        template body templateRequest true "模板信息"
+// @Success      200      {object} models.ParamTemplate
+// @Router       /templates [post]
+func (h *TemplateHandler) CreateTemplate(c *gin.Context) {
+	var req templateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	template, err := h.service.CreateTemplate(c.Request.Context(), req.Name, req.TaskType, datatypes.JSONMap(req.Config))
+	if err != nil {
+		utils.Fail(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, template)
+}
+
+// UpdateTemplate 更新模板
+// @Summary      更新模板
+// @Tags         Template
+// @Accept       json
+// @Produce      json
+// @Param        id path int true "模板 ID"
+// @Param        template body templateRequest true "模板信息"
+// @Success      200 {object} models.ParamTemplate
+// @Router       /templates/{id} [put]
+func (h *TemplateHandler) UpdateTemplate(c *gin.Context) {
+	var req templateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	id, err := parseUintParam(c, "id")
+	if err != nil {
+		utils.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	template, err := h.service.UpdateTemplate(c.Request.Context(), id, req.Name, req.TaskType, datatypes.JSONMap(req.Config))
+	if err != nil {
+		utils.Fail(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, template)
+}
+
+// DeleteTemplate 删除模板
+// @Summary      删除模板
+// @Tags         Template
+// @Param        id path int true "模板 ID"
+// @Success      200 {object} map[string]string
+// @Router       /templates/{id} [delete]
+func (h *TemplateHandler) DeleteTemplate(c *gin.Context) {
+	id, err := parseUintParam(c, "id")
+	if err != nil {
+		utils.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.service.DeleteTemplate(c.Request.Context(), id); err != nil {
+		utils.Fail(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, gin.H{"message": "deleted"})
+}
+
+func parseUintParam(c *gin.Context, key string) (uint, error) {
+	value := c.Param(key)
+	id64, err := strconv.ParseUint(value, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return uint(id64), nil
+}

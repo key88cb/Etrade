@@ -11,7 +11,7 @@ type ArbitrageOpportunity struct {
 	BuyPrice     float64           `json:"buy_price" gorm:"not null"`
 	SellPrice    float64           `json:"sell_price" gorm:"not null"`
 	ProfitUSDT   float64           `json:"profit_usdt" gorm:"not null"`
-	DetailsJSON  datatypes.JSONMap `json:"details,omitempty" gorm:"type:jsonb"`
+	DetailsJSON  datatypes.JSONMap `json:"details,omitempty" gorm:"type:jsonb" swaggertype:"object"`
 }
 
 // PaginationData 定义分页响应的结构

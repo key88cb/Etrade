@@ -8,6 +8,7 @@ import (
 
 // Task 记录每一个数据处理或分析任务的生命周期
 type Task struct {
+	TaskID          string            `gorm:"type:varchar(64);uniqueIndex" json:"task_id"`
 	ID              uint              `gorm:"primaryKey"`
 	Type            string            `gorm:"type:varchar(64);not null"`
 	ConfigJSON      datatypes.JSONMap `gorm:"type:jsonb"`
@@ -37,7 +38,7 @@ type ParamTemplate struct {
 	ID         uint              `gorm:"primaryKey"`
 	Name       string            `gorm:"type:varchar(128);not null"`
 	TaskType   string            `gorm:"type:varchar(64);not null"`
-	ConfigJSON datatypes.JSONMap `gorm:"type:jsonb"`
+	ConfigJSON datatypes.JSONMap `gorm:"type:jsonb" swaggertype:"object"`
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 }

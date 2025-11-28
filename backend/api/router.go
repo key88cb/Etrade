@@ -7,7 +7,7 @@ import (
 )
 
 // SetupRouter 配置路由
-func SetupRouter() *gin.Engine {
+func SetupRouter(taskHandler *TaskHandler, templateHandler *TemplateHandler, batchHandler *BatchHandler, reportHandler *ReportHandler) *gin.Engine {
 	r := gin.Default()
 
 	// 配置CORS中间件，允许所有来源的跨域请求 (在开发阶段)
@@ -24,6 +24,19 @@ func SetupRouter() *gin.Engine {
 		// 3. 将路由绑定到 Handler 的方法上
 		apiV1.GET("/opportunities", h.GetOpportunities)
 		apiV1.GET("/price-comparison", h.GetPriceComparisonData)
+
+		if taskHandler != nil {
+			taskHandler.Register(apiV1)
+		}
+		if templateHandler != nil {
+			templateHandler.Register(apiV1)
+		}
+		if batchHandler != nil {
+			batchHandler.Register(apiV1)
+		}
+		if reportHandler != nil {
+			reportHandler.Register(apiV1)
+		}
 	}
 
 	return r

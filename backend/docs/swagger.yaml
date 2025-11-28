@@ -8,6 +8,15 @@ definitions:
         example: 请求参数无效
         type: string
     type: object
+  api.ListTasksResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/api.TaskItem'
+        type: array
+      pagination:
+        $ref: '#/definitions/api.TaskPagination'
+    type: object
   api.OpportunitiesResponse:
     properties:
       items:
@@ -64,12 +73,130 @@ definitions:
         example: success
         type: string
     type: object
+  api.TaskDetailResponse:
+    properties:
+      config:
+        additionalProperties: true
+        type: object
+      duration_secs:
+        type: integer
+      finished_at:
+        type: string
+      log_summary:
+        type: string
+      queued_at:
+        type: string
+      started_at:
+        type: string
+      status:
+        type: string
+      task_id:
+        type: string
+      trigger:
+        type: string
+      type:
+        type: string
+    type: object
+  api.TaskItem:
+    properties:
+      finished_at:
+        type: string
+      queued_at:
+        type: string
+      started_at:
+        type: string
+      status:
+        type: string
+      task_id:
+        type: string
+      trigger:
+        type: string
+      type:
+        type: string
+    type: object
+  api.TaskLogItem:
+    properties:
+      level:
+        type: string
+      message:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  api.TaskLogResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/api.TaskLogItem'
+        type: array
+    type: object
+  api.TaskPagination:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+    type: object
+  api.batchRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      refreshed:
+        type: boolean
+    required:
+    - name
+    type: object
+  api.reportRequest:
+    properties:
+      batch_id:
+        type: integer
+      file_path:
+        type: string
+      format:
+        type: string
+      template_id:
+        type: integer
+    required:
+    - batch_id
+    - format
+    type: object
+  api.runTemplateRequest:
+    properties:
+      overrides:
+        additionalProperties: true
+        type: object
+      task_id:
+        type: string
+      trigger:
+        type: string
+    type: object
+  api.templateRequest:
+    properties:
+      config:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      task_type:
+        type: string
+    required:
+    - name
+    - task_type
+    type: object
   models.ArbitrageOpportunity:
     properties:
+      batch_id:
+        type: integer
       buy_platform:
         type: string
       buy_price:
         type: number
+      details:
+        type: object
       id:
         type: integer
       profit_usdt:
@@ -79,9 +206,135 @@ definitions:
       sell_price:
         type: number
     type: object
+  models.Batch:
+    properties:
+      createdAt:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      lastRefreshedAt:
+        type: string
+      name:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.ParamTemplate:
+    properties:
+      configJSON:
+        type: object
+      createdAt:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      taskType:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.Report:
+    properties:
+      batchID:
+        type: integer
+      createdAt:
+        type: string
+      filePath:
+        type: string
+      format:
+        type: string
+      generatedAt:
+        type: string
+      id:
+        type: integer
+      templateID:
+        type: integer
+      updatedAt:
+        type: string
+    type: object
 info:
   contact: {}
 paths:
+  /batches:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Batch'
+            type: array
+      summary: 批次列表
+      tags:
+      - Batch
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 批次信息
+        in: body
+        name: batch
+        required: true
+        schema:
+          $ref: '#/definitions/api.batchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Batch'
+      summary: 创建批次
+      tags:
+      - Batch
+  /batches/{id}:
+    get:
+      parameters:
+      - description: 批次 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Batch'
+      summary: 批次详情
+      tags:
+      - Batch
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 批次 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 批次信息
+        in: body
+        name: batch
+        required: true
+        schema:
+          $ref: '#/definitions/api.batchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Batch'
+      summary: 更新批次
+      tags:
+      - Batch
   /opportunities:
     get:
       consumes:
@@ -169,4 +422,218 @@ paths:
       summary: 获取价格对比数据 (UC-01)
       tags:
       - Visualization
+  /reports:
+    get:
+      parameters:
+      - description: 批次 ID
+        in: query
+        name: batch_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Report'
+            type: array
+      summary: 报告列表
+      tags:
+      - Report
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 报告参数
+        in: body
+        name: report
+        required: true
+        schema:
+          $ref: '#/definitions/api.reportRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Report'
+      summary: 记录报告生成结果
+      tags:
+      - Report
+  /tasks:
+    get:
+      description: 查询任务列表，可分页
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ListTasksResponse'
+      summary: 任务列表
+      tags:
+      - Task
+  /tasks/{task_id}:
+    get:
+      description: 根据 task_id 查询单个任务
+      parameters:
+      - description: 任务 ID
+        in: path
+        name: task_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.TaskDetailResponse'
+      summary: 任务详情
+      tags:
+      - Task
+  /tasks/{task_id}/logs:
+    get:
+      description: 查询某个任务的日志
+      parameters:
+      - description: 任务 ID
+        in: path
+        name: task_id
+        required: true
+        type: string
+      - default: 50
+        description: 每页条数
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: 偏移量
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.TaskLogResponse'
+      summary: 任务日志
+      tags:
+      - Task
+  /templates:
+    get:
+      description: 查询所有任务模板
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.ParamTemplate'
+            type: array
+      summary: 模板列表
+      tags:
+      - Template
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 模板信息
+        in: body
+        name: template
+        required: true
+        schema:
+          $ref: '#/definitions/api.templateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ParamTemplate'
+      summary: 创建模板
+      tags:
+      - Template
+  /templates/{id}:
+    delete:
+      parameters:
+      - description: 模板 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 删除模板
+      tags:
+      - Template
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 模板 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 模板信息
+        in: body
+        name: template
+        required: true
+        schema:
+          $ref: '#/definitions/api.templateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ParamTemplate'
+      summary: 更新模板
+      tags:
+      - Template
+  /templates/{id}/run:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 模板 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 覆盖参数
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/api.runTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.TaskDetailResponse'
+      summary: 运行模板
+      tags:
+      - Template
 swagger: "2.0"

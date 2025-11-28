@@ -4,10 +4,13 @@ import (
 	"backend/api"
 	"backend/config"
 	"backend/db"
+	"backend/grpcserver"
+	"backend/service"
 	"log"
 
 	docs "backend/docs" // 导入 swag 生成的 docs
 
+	"github.com/spf13/viper"
 	swaggerFiles "github.com/swaggo/files"     // 导入 swaggerFiles
 	ginSwagger "github.com/swaggo/gin-swagger" // 导入 ginSwagger
 )
@@ -22,8 +25,27 @@ func main() {
 	if err := db.InitDB(); err != nil {
 		log.Printf("Failed to initialize database: %v", err)
 	}
+	taskManager := service.NewTaskManager(db.GetDB())
+	templateService := service.NewTemplateService(db.GetDB(), taskManager)
+	batchService := service.NewBatchService(db.GetDB())
+	reportService := service.NewReportService(db.GetDB())
+
+	go func() {
+		grpcCfg := grpcserver.Config{
+			Port:    viper.GetString("grpc.port"),
+			Trigger: "grpc",
+		}
+		if err := grpcserver.Run(grpcCfg, taskManager); err != nil {
+			log.Printf("Failed to start gRPC server: %v", err)
+		}
+	}()
+
 	// 2. 设置并获取路由引擎
-	r := api.SetupRouter()
+	taskHandler := api.NewTaskHandler(taskManager)
+	templateHandler := api.NewTemplateHandler(templateService, taskManager)
+	batchHandler := api.NewBatchHandler(batchService)
+	reportHandler := api.NewReportHandler(reportService)
+	r := api.SetupRouter(taskHandler, templateHandler, batchHandler, reportHandler)
 
 	docs.SwaggerInfo.BasePath = "/api/v1" // 告诉 swag API 的基础路径
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

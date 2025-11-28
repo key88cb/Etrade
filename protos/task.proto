@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 package task.v1;
+option go_package = "backend/pkg/taskpb;taskpb";
 
 // TaskService 定义了任务执行与管理的 RPC 接口。
 service TaskService {

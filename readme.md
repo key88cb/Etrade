@@ -110,3 +110,80 @@ type BinanceTrade struct {
 	Quantity  float64   `gorm:"not null"`
 }
 ```
+
+## 系统部署指南
+
+### 1. 依赖准备
+
+- 操作系统：推荐 Linux 或 Windows（PowerShell）
+- PostgreSQL：用于存储套利任务、批次、机会等数据（默认端口 5432）
+- Go 1.20+：运行后端 API
+- Python 3.10+：运行数据脚本/worker（建议使用虚拟环境 `.venv`）
+- Node.js 18+：运行前端
+
+环境变量建议：
+
+```bash
+# 在仓库根目录
+python -m venv .venv
+./.venv/Scripts/activate  # Windows 上运行
+pip install -r data/requirements.txt
+
+cd backend && go mod tidy
+cd ../frontend && npm install
+```
+
+### 2. 数据库初始化
+
+1. 在 PostgreSQL 中创建数据库 `etrade`（或在 `backend/config/config.yaml` 中自定义）。
+2. 运行后端（见下）会自动执行 GORM 的 AutoMigrate，创建 `tasks/batches/arbitrage_opportunities` 等表。
+3. 如需导入初始数据，可手动执行 SQL 或运行 `data/block_chain/collect_*` 脚本。
+
+### 3. 数据脚本 Worker（Python）
+
+Python 端负责实际执行任务（采集/分析）并写入日志：
+
+```bash
+cd data
+python -m grpc_tools.protoc --python_out=protos --grpc_python_out=protos --proto_path=protos task.proto
+# 启动 worker（默认读取 data/config/config.yaml，监听 worker_port=50052）
+python server.py
+```
+
+`data/server.py` 会：
+1. 监听 gRPC RPC（CollectBinance/CollectUniswap/Analyse）。
+2. 读取 `config/config.yaml` 中的 DB 配置写入 `task_logs` 与更新 `tasks.status`。
+3. 调用 `block_chain/analyse.py` 等脚本执行任务。
+
+确保 `PYTHONPATH` 包含项目根目录（以便导入 `protos.task_pb2`）。
+
+### 4. Go 后端
+
+后端同时暴露 HTTP (默认 `:8888`) 和内部 gRPC (默认 `:50060`)：
+
+```bash
+cd backend
+go run main.go
+```
+
+- `backend/config/config.yaml` 的 `worker.address` 指定 Python worker 地址（如 `127.0.0.1:50052`）。
+- `go run main.go` 后会自动拨通 worker，并在模板运行时将任务派发给 Python。
+- HTTP API 对外服务 `/api/v1/*`，Swagger 地址 `http://localhost:8888/swagger/index.html`。
+
+### 5. 前端
+
+```bash
+cd frontend
+npm run dev        # 开发模式
+# 或 npm run build && npm run preview
+```
+
+默认后端 API 地址为 `http://localhost:8888/api/v1`，若需修改可设置 `VITE_BACKEND_URL`。
+
+### 6. 常见问题
+
+- **任务一直 RUNNING**：确认 Python worker 已启动，且后端 `worker.address` 指向正确端口；检查数据库 `task_logs` 是否有日志，若无则 worker 未执行。
+- **端口冲突**：Go gRPC 使用 `grpc.port`（默认 `:50060`），Python worker 使用 `worker_port`（默认 `50052`）。确保两边不冲突。
+- **proto 导入失败**：记得 `pip install grpcio-tools` 并运行 protoc 生成 `task_pb2*.py`，然后在运行脚本前设置 PYTHONPATH。
+
+按以上步骤即可启动完整系统：先启动 PostgreSQL → Python worker → Go 后端 → 前端；然后访问前端面板或 REST API，即可使用套利分析平台。

@@ -11,11 +11,12 @@ import (
 )
 
 type TemplateService struct {
-	db *gorm.DB
+	db          *gorm.DB
+	taskManager *TaskManager
 }
 
-func NewTemplateService(db *gorm.DB) *TemplateService {
-	return &TemplateService{db: db}
+func NewTemplateService(db *gorm.DB, taskManager *TaskManager) *TemplateService {
+	return &TemplateService{db: db, taskManager: taskManager}
 }
 
 func (s *TemplateService) CreateTemplate(ctx context.Context, name, taskType string, config datatypes.JSONMap) (*models.ParamTemplate, error) {
@@ -58,6 +59,29 @@ func (s *TemplateService) ListTemplates(ctx context.Context) ([]models.ParamTemp
 	var templates []models.ParamTemplate
 	err := s.db.WithContext(ctx).Order("id DESC").Find(&templates).Error
 	return templates, err
+}
+
+func (s *TemplateService) GetTemplate(ctx context.Context, id uint) (*models.ParamTemplate, error) {
+	var template models.ParamTemplate
+	if err := s.db.WithContext(ctx).First(&template, id).Error; err != nil {
+		return nil, err
+	}
+	return &template, nil
+}
+
+func (s *TemplateService) RunTemplate(ctx context.Context, templateID uint, overrides map[string]interface{}, taskID, trigger string) (*models.Task, error) {
+	template, err := s.GetTemplate(ctx, templateID)
+	if err != nil {
+		return nil, err
+	}
+	config := datatypes.JSONMap{}
+	for k, v := range template.ConfigJSON {
+		config[k] = v
+	}
+	for k, v := range overrides {
+		config[k] = v
+	}
+	return s.taskManager.CreateTask(ctx, template.TaskType, taskID, trigger, config)
 }
 
 type BatchService struct {

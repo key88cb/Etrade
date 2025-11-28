@@ -12,11 +12,12 @@ import (
 )
 
 type TemplateHandler struct {
-	service *service.TemplateService
+	service     *service.TemplateService
+	taskManager *service.TaskManager
 }
 
-func NewTemplateHandler(s *service.TemplateService) *TemplateHandler {
-	return &TemplateHandler{service: s}
+func NewTemplateHandler(s *service.TemplateService, tm *service.TaskManager) *TemplateHandler {
+	return &TemplateHandler{service: s, taskManager: tm}
 }
 
 // Register 注册模板相关路由
@@ -25,12 +26,19 @@ func (h *TemplateHandler) Register(rg *gin.RouterGroup) {
 	rg.POST("/templates", h.CreateTemplate)
 	rg.PUT("/templates/:id", h.UpdateTemplate)
 	rg.DELETE("/templates/:id", h.DeleteTemplate)
+	rg.POST("/templates/:id/run", h.RunTemplate)
 }
 
 type templateRequest struct {
 	Name     string                 `json:"name" binding:"required"`
 	TaskType string                 `json:"task_type" binding:"required"`
 	Config   map[string]interface{} `json:"config"`
+}
+
+type runTemplateRequest struct {
+	TaskID    string                 `json:"task_id"`
+	Trigger   string                 `json:"trigger"`
+	Overrides map[string]interface{} `json:"overrides"`
 }
 
 // TemplateResponse 模板响应
@@ -124,6 +132,39 @@ func (h *TemplateHandler) DeleteTemplate(c *gin.Context) {
 		return
 	}
 	utils.Success(c, gin.H{"message": "deleted"})
+}
+
+// RunTemplate 根据模板创建任务
+// @Summary 运行模板
+// @Tags    Template
+// @Accept  json
+// @Produce json
+// @Param   id path int true "模板 ID"
+// @Param   body body runTemplateRequest false "覆盖参数"
+// @Success 200 {object} api.TaskDetailResponse
+// @Router  /templates/{id}/run [post]
+func (h *TemplateHandler) RunTemplate(c *gin.Context) {
+	id, err := parseUintParam(c, "id")
+	if err != nil {
+		utils.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	var req runTemplateRequest
+	if err := c.ShouldBindJSON(&req); err != nil && err.Error() != "EOF" {
+		utils.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	task, err := h.service.RunTemplate(c.Request.Context(), id, req.Overrides, req.TaskID, req.Trigger)
+	if err != nil {
+		utils.Fail(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, TaskDetailResponse{
+		TaskID: task.TaskID,
+		Type:   task.Type,
+		Status: task.Status,
+		Config: task.ConfigJSON,
+	})
 }
 
 func parseUintParam(c *gin.Context, key string) (uint, error) {

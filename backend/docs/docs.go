@@ -548,6 +548,45 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/templates/{id}/run": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Template"
+                ],
+                "summary": "运行模板",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "模板 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "覆盖参数",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/api.runTemplateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.TaskDetailResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -796,6 +835,21 @@ const docTemplate = `{
                 },
                 "template_id": {
                     "type": "integer"
+                }
+            }
+        },
+        "api.runTemplateRequest": {
+            "type": "object",
+            "properties": {
+                "overrides": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "task_id": {
+                    "type": "string"
+                },
+                "trigger": {
+                    "type": "string"
                 }
             }
         },

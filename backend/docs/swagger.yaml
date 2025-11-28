@@ -164,6 +164,16 @@ definitions:
     - batch_id
     - format
     type: object
+  api.runTemplateRequest:
+    properties:
+      overrides:
+        additionalProperties: true
+        type: object
+      task_id:
+        type: string
+      trigger:
+        type: string
+    type: object
   api.templateRequest:
     properties:
       config:
@@ -599,6 +609,31 @@ paths:
           schema:
             $ref: '#/definitions/models.ParamTemplate'
       summary: 更新模板
+      tags:
+      - Template
+  /templates/{id}/run:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 模板 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 覆盖参数
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/api.runTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.TaskDetailResponse'
+      summary: 运行模板
       tags:
       - Template
 swagger: "2.0"

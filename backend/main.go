@@ -26,7 +26,7 @@ func main() {
 		log.Printf("Failed to initialize database: %v", err)
 	}
 	taskManager := service.NewTaskManager(db.GetDB())
-	templateService := service.NewTemplateService(db.GetDB())
+	templateService := service.NewTemplateService(db.GetDB(), taskManager)
 	batchService := service.NewBatchService(db.GetDB())
 	reportService := service.NewReportService(db.GetDB())
 
@@ -42,7 +42,7 @@ func main() {
 
 	// 2. 设置并获取路由引擎
 	taskHandler := api.NewTaskHandler(taskManager)
-	templateHandler := api.NewTemplateHandler(templateService)
+	templateHandler := api.NewTemplateHandler(templateService, taskManager)
 	batchHandler := api.NewBatchHandler(batchService)
 	reportHandler := api.NewReportHandler(reportService)
 	r := api.SetupRouter(taskHandler, templateHandler, batchHandler, reportHandler)

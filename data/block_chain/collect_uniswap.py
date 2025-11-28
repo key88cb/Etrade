@@ -10,7 +10,7 @@ from psycopg2.extras import execute_values
 
 from .task import check_task, update_task_status
 
-with open("../config/config.yaml", "r", encoding="utf-8") as file:
+with open("./config/config.yaml", "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)
 
 db_config = config.get("db", {})
@@ -157,4 +157,4 @@ def collect_uniswap(
         return 0
 
 if __name__ == "__main__":
-    collect_uniswap(3, "0x11b815efb8f581194ae79006d24e0d814b7697f6", 1756684800, 1759276799)
+    collect_uniswap(1, "0x11b815efb8f581194ae79006d24e0d814b7697f6", 1756684800, 1756771200)

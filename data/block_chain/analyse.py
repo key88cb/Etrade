@@ -7,7 +7,7 @@ import yaml
 from loguru import logger
 from psycopg2.extras import Json, execute_values
 
-from .task import check_task, update_task_status
+from task import check_task, update_task_status
 
 with open("../config/config.yaml", "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)
@@ -218,7 +218,7 @@ def save_results(
             logger.info("没有结果需要写入。")
             return
 
-        logger.info("正在写入 %s 条套利机会...", len(results))
+        logger.info(f"正在写入 {len(results)} 条套利机会...")
         records = []
         for item in results:
             details = {
@@ -252,8 +252,7 @@ def save_results(
 
 
 def run_analyse(
-    task_id: Optional[str] = None,
-    config_json: Optional[str] = None,
+    task_id: str,
     **kwargs
 ):
     strategy_params = {
@@ -265,14 +264,15 @@ def run_analyse(
         "window_seconds": kwargs.get("window_seconds", 5),
         "profit_threshold": kwargs.get("profit_threshold", 10),
     }
-    batch_id = int(kwargs.get("batch_id", 1))
-    overwrite = bool(kwargs.get("overwrite", False))
+    batch_id = kwargs.get("batch_id", 1)
+    overwrite = kwargs.get("overwrite", False)
     experiment_id = kwargs.get("experiment_id")
 
     start_ts = _parse_timestamp(kwargs.get("start"))
     end_ts = _parse_timestamp(kwargs.get("end"))
     if start_ts and end_ts and start_ts > end_ts:
-        raise ValueError("start 必须早于 end")
+        update_task_status(task_id, 2)
+        return
     logger.info("套利分析任务启动")
     conn = psycopg2.connect(
         host=db_config["host"],
@@ -292,10 +292,13 @@ def run_analyse(
         conn.rollback()
         logger.error(f"分析失败: {exc}")
         conn.close()
+        update_task_status(task_id, 2)
         raise
     else:
         logger.info(f"分析完成，发现 {len(opportunities)} 条机会")
+        update_task_status(task_id, 1)
         conn.close()
 
 if __name__ == "__main__":
-    run_analyse(task_id="1", config_json="", binance_fee_rate=0.001, uniswap_fee_rate=0.0005, estimated_gas_used=20, initial_investment=100000.0, time_delay_seconds=3, window_seconds=5, profit_threshold=10)
+    run_analyse(task_id="1", binance_fee_rate=0.001, uniswap_fee_rate=0.0005, 
+        estimated_gas_used=20, initial_investment=100000.0, time_delay_seconds=3, window_seconds=5, profit_threshold=10)

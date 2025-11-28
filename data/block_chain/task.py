@@ -2,7 +2,7 @@ import psycopg2
 import yaml
 
 # 默认配置
-with open("config/config.yaml", "r", encoding="utf-8") as file:
+with open("../config/config.yaml", "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)
 
 db_config = config.get("db", {})
@@ -33,7 +33,7 @@ def update_task_status(task_id: str, status: int):
         password=db_config["password"],
     ) as conn:
         with conn.cursor() as cursor:
-            cursor.execute("UPDATE task_results SET status = %s WHERE task_id = %s", (status, task_id))
+            cursor.execute("UPDATE task_results SET status = %s WHERE task_id = %s", (status, str(task_id)))
 
 if __name__ == "__main__":
     print(check_task("1"))

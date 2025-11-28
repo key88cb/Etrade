@@ -65,6 +65,17 @@ interface TemplateConfigs {
 const props = defineProps<Props>();
 const remoteTasks = ref<any[]>([]);
 const templates = ref<any[]>([]);
+const normalizeTemplate = (tpl: any) => {
+  if (!tpl) return tpl;
+  return {
+    ...tpl,
+    id: tpl.id ?? tpl.ID ?? tpl.Id,
+    name: tpl.name ?? tpl.Name,
+    task_type: tpl.task_type ?? tpl.TaskType ?? tpl.taskType,
+    config: getTemplateConfig(tpl),
+  };
+};
+
 const templateByType = computed<Record<PipelineTaskType, any | undefined>>(() => {
   const base: Record<PipelineTaskType, any | undefined> = {
     collect_binance: undefined,
@@ -290,7 +301,8 @@ const fetchControlData = async () => {
       api.getTemplates(),
     ]);
     remoteTasks.value = taskRes.data?.data?.items ?? [];
-    templates.value = templateRes.data?.data ?? templateRes.data ?? [];
+    const rawTemplates = templateRes.data?.data ?? templateRes.data ?? [];
+    templates.value = rawTemplates.map((tpl: any) => normalizeTemplate(tpl));
   } catch (error: any) {
     controlError.value = error?.message ?? '控制中心数据加载失败';
   }
@@ -302,13 +314,6 @@ const darkInputClass =
   'bg-[#0d1117] border-[#30363d] text-[#e6edf3] focus:ring-[#1f6feb]';
 const lightInputClass =
   'bg-[#f6f8fa] border-[#d0d7de] text-[#24292f] focus:ring-[#0969da]';
-
-const defaultTemplateNames: Record<PipelineTaskType, string> = {
-  collect_binance: 'Binance 导入模板',
-  collect_uniswap: 'Uniswap 采集模板',
-  process_prices: '价格聚合模板',
-  analyse: '套利分析模板',
-};
 
 const getTemplateConfig = (tpl: any) => {
   if (!tpl) return {};
@@ -322,6 +327,13 @@ const formatTemplateConfig = (tpl: any) => {
   } catch {
     return String(cfg);
   }
+};
+
+const defaultTemplateNames: Record<PipelineTaskType, string> = {
+  collect_binance: 'Binance 导入模板',
+  collect_uniswap: 'Uniswap 采集模板',
+  process_prices: '价格聚合模板',
+  analyse: '套利分析模板',
 };
 
 const runTemplateQuick = async (id: number) => {

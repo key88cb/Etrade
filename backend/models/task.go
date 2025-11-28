@@ -45,42 +45,42 @@ type ParamTemplate struct {
 
 // Batch 表示一批套利机会或分析结果的集合
 type Batch struct {
-	ID              uint   `gorm:"primaryKey"`
-	Name            string `gorm:"type:varchar(128);not null"`
-	Description     string `gorm:"type:text"`
-	LastRefreshedAt *time.Time
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID              uint       `gorm:"primaryKey" json:"id"`
+	Name            string     `gorm:"type:varchar(128);not null" json:"name"`
+	Description     string     `gorm:"type:text" json:"description"`
+	LastRefreshedAt *time.Time `json:"last_refreshed_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 // Report 记录某个批次的报告文件
 type Report struct {
-	ID          uint   `gorm:"primaryKey"`
-	BatchID     uint   `gorm:"index;not null"`
-	TemplateID  uint   `gorm:"index"`
-	Format      string `gorm:"type:varchar(16);not null"`
-	FilePath    string `gorm:"type:varchar(512);not null"`
-	GeneratedAt time.Time
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	BatchID     uint      `gorm:"index;not null" json:"batch_id"`
+	TemplateID  uint      `gorm:"index" json:"template_id"`
+	Format      string    `gorm:"type:varchar(16);not null" json:"format"`
+	FilePath    string    `gorm:"type:varchar(512);not null" json:"file_path"`
+	GeneratedAt time.Time `json:"generated_at"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // Experiment 一组模板运行视作一次实验，便于对比
 type Experiment struct {
-	ID          uint   `gorm:"primaryKey"`
-	BatchID     uint   `gorm:"index;not null"`
-	Description string `gorm:"type:text"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	BatchID     uint      `gorm:"index;not null" json:"batch_id"`
+	Description string    `gorm:"type:text" json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // ExperimentRun 记录某次实验中单个模板的运行结果
 type ExperimentRun struct {
-	ID           uint              `gorm:"primaryKey"`
-	ExperimentID uint              `gorm:"index;not null"`
-	TemplateID   uint              `gorm:"index"`
-	TaskID       uint              `gorm:"index"`
-	MetricsJSON  datatypes.JSONMap `gorm:"type:jsonb"`
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID           uint              `gorm:"primaryKey" json:"id"`
+	ExperimentID uint              `gorm:"index;not null" json:"experiment_id"`
+	TemplateID   uint              `gorm:"index" json:"template_id"`
+	TaskID       uint              `gorm:"index" json:"task_id"`
+	MetricsJSON  datatypes.JSONMap `gorm:"type:jsonb" json:"metrics"`
+	CreatedAt    time.Time         `json:"created_at"`
+	UpdatedAt    time.Time         `json:"updated_at"`
 }

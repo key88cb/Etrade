@@ -1,11 +1,18 @@
-
 <style scoped>
-.input {
-  width: 100%;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  padding: 0.35rem 0.5rem;
-  background-color: transparent;
-  color: inherit;
+.datetime-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}
+
+.datetime-input-dark::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+.datetime-input-light::-webkit-calendar-picker-indicator {
+  filter: none;
+}
+
+.template-config {
+  max-height: 120px;
+  overflow: auto;
 }
 </style>

@@ -65,6 +65,20 @@ interface TemplateConfigs {
 const props = defineProps<Props>();
 const remoteTasks = ref<any[]>([]);
 const templates = ref<any[]>([]);
+const templateByType = computed<Record<PipelineTaskType, any | undefined>>(() => {
+  const base: Record<PipelineTaskType, any | undefined> = {
+    collect_binance: undefined,
+    collect_uniswap: undefined,
+    process_prices: undefined,
+    analyse: undefined,
+  };
+  templates.value.forEach((tpl) => {
+    if (tpl.task_type && tpl.task_type in base) {
+      base[tpl.task_type as PipelineTaskType] = tpl;
+    }
+  });
+  return base;
+});
 const reportForm = ref({
   batch_id: '',
   format: 'PDF',
@@ -72,6 +86,8 @@ const reportForm = ref({
 });
 const controlError = ref('');
 const runningTemplateId = ref<number | null>(null);
+const creatingTemplateType = ref<PipelineTaskType | null>(null);
+const deletingTemplateId = ref<number | null>(null);
 
 const templateConfigs = reactive<TemplateConfigs>({
   collect_binance: {
@@ -188,18 +204,32 @@ const statusIcon = (status: TaskStatus) => {
   return null;
 };
 
-const toUnixSeconds = (value: string) => {
+const parseShanghaiDateTime = (value: string) => {
   if (!value) return undefined;
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) return undefined;
-  return Math.floor(parsed / 1000);
+  const [datePart, timePart] = value.split('T');
+  if (!datePart || !timePart) return undefined;
+  const [year, month, day] = datePart.split('-').map((n) => Number(n));
+  const [hourStr, minuteStr, secondStr] = timePart.split(':');
+  const hour = Number(hourStr ?? '0');
+  const minute = Number(minuteStr ?? '0');
+  const second = Number(secondStr ?? '0');
+  if ([year, month, day, hour, minute, second].some((n) => Number.isNaN(n))) {
+    return undefined;
+  }
+  const date = new Date(Date.UTC(year, month - 1, day, hour - 8, minute, second));
+  return Number.isNaN(date.getTime()) ? undefined : date;
+};
+
+const toUnixSeconds = (value: string) => {
+  const parsed = parseShanghaiDateTime(value);
+  if (!parsed) return undefined;
+  return Math.floor(parsed.getTime() / 1000);
 };
 
 const toISODateTime = (value: string) => {
-  if (!value) return undefined;
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) return undefined;
-  return new Date(parsed).toISOString();
+  const parsed = parseShanghaiDateTime(value);
+  if (!parsed) return undefined;
+  return parsed.toISOString();
 };
 
 const buildOverrides = (taskType: PipelineTaskType): Record<string, unknown> => {
@@ -215,8 +245,14 @@ const buildOverrides = (taskType: PipelineTaskType): Record<string, unknown> => 
       if (typeof endTs === 'number') overrides.end_ts = endTs;
       return overrides;
     }
-    case 'process_prices':
-      return { ...templateConfigs.process_prices };
+    case 'process_prices': {
+      const overrides: Record<string, unknown> = { ...templateConfigs.process_prices };
+      const startISO = toISODateTime(templateConfigs.process_prices.start_date);
+      if (startISO) overrides.start_date = startISO;
+      const endISO = toISODateTime(templateConfigs.process_prices.end_date);
+      if (endISO) overrides.end_date = endISO;
+      return overrides;
+    }
     case 'analyse': {
       const { batch_id, overwrite, window_start, window_end, strategy } = templateConfigs.analyse;
       const overrides: Record<string, unknown> = {
@@ -267,6 +303,27 @@ const darkInputClass =
 const lightInputClass =
   'bg-[#f6f8fa] border-[#d0d7de] text-[#24292f] focus:ring-[#0969da]';
 
+const defaultTemplateNames: Record<PipelineTaskType, string> = {
+  collect_binance: 'Binance 导入模板',
+  collect_uniswap: 'Uniswap 采集模板',
+  process_prices: '价格聚合模板',
+  analyse: '套利分析模板',
+};
+
+const getTemplateConfig = (tpl: any) => {
+  if (!tpl) return {};
+  return tpl.config ?? tpl.ConfigJSON ?? tpl.config_json ?? tpl.Config ?? {};
+};
+
+const formatTemplateConfig = (tpl: any) => {
+  const cfg = getTemplateConfig(tpl);
+  try {
+    return JSON.stringify(cfg, null, 2);
+  } catch {
+    return String(cfg);
+  }
+};
+
 const runTemplateQuick = async (id: number) => {
   runningTemplateId.value = id;
   controlError.value = '';
@@ -277,6 +334,53 @@ const runTemplateQuick = async (id: number) => {
     controlError.value = error?.message ?? '运行模板失败';
   } finally {
     runningTemplateId.value = null;
+  }
+};
+
+const createTemplateForTask = async (taskType: PipelineTaskType, silent = false) => {
+  if (!silent) {
+    creatingTemplateType.value = taskType;
+    controlError.value = '';
+  }
+  try {
+    const config = buildOverrides(taskType);
+    const name = `${defaultTemplateNames[taskType]} ${new Date().toLocaleString('zh-CN', {
+      hour12: false,
+    })}`;
+    await api.createTemplate({
+      name,
+      task_type: taskType,
+      config,
+    });
+    await fetchControlData();
+    return templateByType.value[taskType];
+  } catch (error: any) {
+    if (!silent) {
+      controlError.value = error?.message ?? '创建模板失败';
+    } else {
+      controlError.value = error?.message ?? controlError.value;
+    }
+    throw error;
+  } finally {
+    if (!silent) {
+      creatingTemplateType.value = null;
+    }
+  }
+};
+
+const handleDeleteTemplate = async (id: number) => {
+  if (!confirm('确定删除该模板？')) {
+    return;
+  }
+  deletingTemplateId.value = id;
+  controlError.value = '';
+  try {
+    await api.deleteTemplate(id);
+    await fetchControlData();
+  } catch (error: any) {
+    controlError.value = error?.message ?? '删除模板失败';
+  } finally {
+    deletingTemplateId.value = null;
   }
 };
 
@@ -304,10 +408,20 @@ onMounted(fetchControlData);
 
 const runPipelineTask = async (taskType: PipelineTaskType) => {
   controlError.value = '';
-  const template = templates.value.find((tpl) => tpl.task_type === taskType);
+  let template = templateByType.value[taskType];
   if (!template) {
-    controlError.value = `未找到 ${taskType} 类型的模板，请先在模板管理中创建。`;
-    return;
+    try {
+      template = await createTemplateForTask(taskType, true);
+    } catch (error) {
+      controlError.value =
+        (error as Error)?.message ?? `创建 ${taskType} 模板失败，无法运行任务。`;
+      updateTaskState(taskType, { status: 'error' });
+      return;
+    }
+    if (!template) {
+      controlError.value = `模板创建失败，无法找到 ${taskType} 的模板。`;
+      return;
+    }
   }
   updateTaskState(taskType, { status: 'running' });
   try {
@@ -323,6 +437,39 @@ const runPipelineTask = async (taskType: PipelineTaskType) => {
     updateTaskState(taskType, { status: 'error' });
   }
 };
+
+const isTaskConfigReady = (taskType: PipelineTaskType) => {
+  switch (taskType) {
+    case 'collect_binance':
+      return (
+        templateConfigs.collect_binance.csv_path.trim().length > 0 &&
+        templateConfigs.collect_binance.import_percentage > 0 &&
+        templateConfigs.collect_binance.chunk_size > 0
+      );
+    case 'collect_uniswap':
+      return (
+        templateConfigs.collect_uniswap.pool_address.trim().length > 0 &&
+        !!templateConfigs.collect_uniswap.start_date &&
+        !!templateConfigs.collect_uniswap.end_date
+      );
+    case 'process_prices':
+      return (
+        !!templateConfigs.process_prices.start_date &&
+        !!templateConfigs.process_prices.end_date &&
+        templateConfigs.process_prices.aggregation_interval.trim().length > 0
+      );
+    case 'analyse':
+      return (
+        !!templateConfigs.analyse.window_start &&
+        !!templateConfigs.analyse.window_end &&
+        templateConfigs.analyse.strategy.profit_threshold >= 0 &&
+        templateConfigs.analyse.strategy.time_delay_seconds >= 0 &&
+        templateConfigs.analyse.strategy.initial_investment > 0
+      );
+    default:
+      return false;
+  }
+};
 </script>
 
 <template>
@@ -336,6 +483,9 @@ const runPipelineTask = async (taskType: PipelineTaskType) => {
         <h2 :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">任务控制中心</h2>
       </div>
       <p v-if="controlError" class="text-xs text-[#f85149]">{{ controlError }}</p>
+      <p class="text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+        所有日期时间字段均以中国上海时间 (UTC+8) 录入，系统会自动换算成 UTC。
+      </p>
       <div class="space-y-3">
         <div
           v-for="task in tasks"
@@ -392,13 +542,27 @@ const runPipelineTask = async (taskType: PipelineTaskType) => {
             </div>
 
             <div class="flex items-center gap-2">
+              <button
+                v-if="!templateByType[task.taskType]"
+                type="button"
+                class="px-2 py-1 text-xs rounded border transition-colors"
+                :class="
+                  isDark
+                    ? 'border-[#30363d] text-[#7d8590] hover:text-[#58a6ff] hover:border-[#58a6ff]'
+                    : 'border-[#d0d7de] text-[#57606a] hover:text-[#0969da] hover:border-[#0969da]'
+                "
+                :disabled="creatingTemplateType === task.taskType"
+                @click="createTemplateForTask(task.taskType)"
+              >
+                {{ creatingTemplateType === task.taskType ? '创建中…' : '创建模板' }}
+              </button>
               <span class="text-xs px-2 py-1 rounded" :class="statusAccent(task.status)">
                 {{ statusLabel(task.status) }}
               </span>
               <button
                 type="button"
                 class="px-3 py-1.5 bg-[#238636] text-white rounded text-sm hover:bg-[#2ea043] transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"
-                :disabled="task.status === 'running'"
+                :disabled="task.status === 'running' || !isTaskConfigReady(task.taskType)"
                 @click="runPipelineTask(task.taskType)"
               >
                 <Play class="w-3 h-3" />
@@ -447,38 +611,62 @@ const runPipelineTask = async (taskType: PipelineTaskType) => {
                   />
                 </label>
                 <label :class="[labelTextClass, 'flex flex-col gap-1']">
-                  <span>Start Date</span>
+                  <span>Start DateTime (上海)</span>
                   <input
-                    type="date"
+                    type="datetime-local"
+                    step="1"
                     v-model="templateConfigs.collect_uniswap.start_date"
-                    :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]"
+                    :class="[
+                      baseInputClass,
+                      isDark ? darkInputClass : lightInputClass,
+                      'datetime-input',
+                      isDark ? 'datetime-input-dark' : 'datetime-input-light',
+                    ]"
                   />
                 </label>
                 <label :class="[labelTextClass, 'flex flex-col gap-1']">
-                  <span>End Date</span>
+                  <span>End DateTime (上海)</span>
                   <input
-                    type="date"
+                    type="datetime-local"
+                    step="1"
                     v-model="templateConfigs.collect_uniswap.end_date"
-                    :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]"
+                    :class="[
+                      baseInputClass,
+                      isDark ? darkInputClass : lightInputClass,
+                      'datetime-input',
+                      isDark ? 'datetime-input-dark' : 'datetime-input-light',
+                    ]"
                   />
                 </label>
               </template>
 
               <template v-else-if="task.taskType === 'process_prices'">
                 <label :class="[labelTextClass, 'flex flex-col gap-1']">
-                  <span>Start Date</span>
+                  <span>Start DateTime (上海)</span>
                   <input
-                    type="date"
+                    type="datetime-local"
+                    step="1"
                     v-model="templateConfigs.process_prices.start_date"
-                    :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]"
+                    :class="[
+                      baseInputClass,
+                      isDark ? darkInputClass : lightInputClass,
+                      'datetime-input',
+                      isDark ? 'datetime-input-dark' : 'datetime-input-light',
+                    ]"
                   />
                 </label>
                 <label :class="[labelTextClass, 'flex flex-col gap-1']">
-                  <span>End Date</span>
+                  <span>End DateTime (上海)</span>
                   <input
-                    type="date"
+                    type="datetime-local"
+                    step="1"
                     v-model="templateConfigs.process_prices.end_date"
-                    :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]"
+                    :class="[
+                      baseInputClass,
+                      isDark ? darkInputClass : lightInputClass,
+                      'datetime-input',
+                      isDark ? 'datetime-input-dark' : 'datetime-input-light',
+                    ]"
                   />
                 </label>
                 <label :class="[labelTextClass, 'flex flex-col gap-1']">
@@ -524,16 +712,28 @@ const runPipelineTask = async (taskType: PipelineTaskType) => {
                   <span>分析开始时间</span>
                   <input
                     type="datetime-local"
+                    step="1"
                     v-model="templateConfigs.analyse.window_start"
-                    :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]"
+                    :class="[
+                      baseInputClass,
+                      isDark ? darkInputClass : lightInputClass,
+                      'datetime-input',
+                      isDark ? 'datetime-input-dark' : 'datetime-input-light',
+                    ]"
                   />
                 </label>
                 <label :class="[labelTextClass, 'flex flex-col gap-1']">
                   <span>分析结束时间</span>
                   <input
                     type="datetime-local"
+                    step="1"
                     v-model="templateConfigs.analyse.window_end"
-                    :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]"
+                    :class="[
+                      baseInputClass,
+                      isDark ? darkInputClass : lightInputClass,
+                      'datetime-input',
+                      isDark ? 'datetime-input-dark' : 'datetime-input-light',
+                    ]"
                   />
                 </label>
                 <label :class="[labelTextClass, 'flex flex-col gap-1']">
@@ -613,22 +813,42 @@ const runPipelineTask = async (taskType: PipelineTaskType) => {
         <div
           v-for="template in templates.slice(0, 4)"
           :key="template.id"
-          class="border rounded px-3 py-2 flex items-center justify-between"
-          :class="isDark ? 'border-[#30363d]' : 'border-[#d0d7de]'"
+          class="border rounded px-3 py-2 space-y-2"
+          :class="isDark ? 'border-[#30363d] bg-[#0d1117]' : 'border-[#d0d7de] bg-[#fefefe]'"
         >
-          <div>
-            <div class="text-sm font-medium">{{ template.name }}</div>
-            <div class="text-xs text-[#7d8590] font-mono">{{ template.task_type }}</div>
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <div class="text-sm font-medium" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">
+                {{ template.name }}
+              </div>
+              <div class="text-xs text-[#7d8590] font-mono">{{ template.task_type }}</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                class="text-xs px-2 py-1 rounded border"
+                :class="isDark ? 'border-[#30363d] text-[#7d8590]' : 'border-[#d0d7de] text-[#57606a]'"
+                :disabled="deletingTemplateId === template.id"
+                @click="handleDeleteTemplate(template.id)"
+              >
+                {{ deletingTemplateId === template.id ? '删除中…' : '删除' }}
+              </button>
+              <button
+                type="button"
+                class="text-xs px-2 py-1 rounded bg-[#238636] text-white hover:bg-[#2ea043] disabled:opacity-40"
+                :disabled="runningTemplateId === template.id"
+                @click="runTemplateQuick(template.id)"
+              >
+                {{ runningTemplateId === template.id ? '运行中…' : '运行' }}
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            class="text-xs px-2 py-1 rounded"
-            :class="isDark ? 'bg-[#21262d] text-[#e6edf3]' : 'bg-[#f6f8fa] text-[#24292f]'"
-            :disabled="runningTemplateId === template.id"
-            @click="runTemplateQuick(template.id)"
+          <pre
+            class="text-xs whitespace-pre-wrap overflow-x-auto rounded px-2 py-1 template-config"
+            :class="isDark ? 'bg-[#010409] text-[#a1b1c9]' : 'bg-[#f6f8fa] text-[#434d5b]'"
           >
-            {{ runningTemplateId === template.id ? '运行中…' : '运行' }}
-          </button>
+{{ formatTemplateConfig(template) }}
+          </pre>
         </div>
       </div>
 

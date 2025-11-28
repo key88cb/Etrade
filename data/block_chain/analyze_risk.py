@@ -7,15 +7,13 @@ Risk analysis placeholder.
 import argparse
 from typing import Optional
 
-from .task_client import TaskClient, load_config_from_string
+from .utils import load_config_from_string
 
 
 def run_analyze_risk(task_id: Optional[str] = None, config_json: Optional[str] = None):
-    client = TaskClient(task_id)
     config = load_config_from_string(config_json)
-    client.update_status("running", "未实现")
     # TODO: 实现风险分析逻辑
-    client.update_status("success", "风险分析占位任务已完成", {"config": config})
+    pass
 
 
 def main():

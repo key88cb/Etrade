@@ -10,7 +10,7 @@ from loguru import logger
 from psycopg2.extras import execute_values
 from tqdm import tqdm
 
-from .task_client import TaskClient, load_config_from_string
+from .utils import load_config_from_string
 
 with open("config/config.yaml", "r", encoding="utf-8") as file:
     _CONFIG = yaml.safe_load(file)
@@ -105,7 +105,6 @@ def run_process_prices(
     task_id: Optional[str] = None, config_json: Optional[str] = None
 ):
     config = load_config_from_string(config_json)
-    client = TaskClient(task_id)
     aggregation_interval = config.get("aggregation_interval", "minute")
     overwrite = bool(config.get("overwrite", True))
     db_overrides = config.get("db", {})
@@ -117,9 +116,8 @@ def run_process_prices(
     if end_dt < start_dt:
         raise ValueError("end_date 不能早于 start_date")
 
-    client.update_status(
-        "running",
-        f"开始聚合 {start_dt.date()} - {end_dt.date()} 数据，粒度 {aggregation_interval}",
+    logger.info(
+        f"开始聚合 {start_dt.date()} - {end_dt.date()} 数据，粒度 {aggregation_interval}"
     )
 
     conn = _build_db_conn(db_overrides)
@@ -156,7 +154,6 @@ def run_process_prices(
 
     if not all_days_dfs:
         logger.info("没有聚合出任何数据。")
-        client.update_status("success", "无数据可写入")
         conn.close()
         return
 
@@ -167,14 +164,12 @@ def run_process_prices(
         _write_aggregated_prices(conn, df_final, overwrite=overwrite)
     except Exception as exc:
         conn.rollback()
-        client.update_status("failed", f"写入失败: {exc}")
+        logger.error(f"写入失败: {exc}")
         conn.close()
         raise
     else:
-        client.update_status(
-            "success",
-            f"聚合完成，共写入 {len(df_final)} 条记录",
-            {"rows": len(df_final), "duration": duration},
+        logger.info(
+            f"聚合完成，共写入 {len(df_final)} 条记录，耗时 {duration:.2f}s"
         )
         conn.close()
 

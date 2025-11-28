@@ -5,4 +5,6 @@ db:
   password: 123456
   database: test_etrade
 grpc:
-  port: ":50052"
+  port: ":50060"
+worker:
+  address: "127.0.0.1:50052"

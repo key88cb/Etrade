@@ -305,9 +305,30 @@ def save_results(
             VALUES %s
             """,
             records,
-        )
+    )
     conn.commit()
     logger.info("写入完成并已提交。")
+
+
+def ensure_batch_exists(conn, batch_id: int) -> None:
+    if not batch_id:
+        return
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM batches WHERE id = %s", (batch_id,))
+        exists = cur.fetchone()
+        if exists:
+            return
+        name = f"Auto Batch {batch_id}"
+        description = "批次由套利分析脚本自动创建"
+        logger.info("批次 %s 不存在，自动创建", batch_id)
+        cur.execute(
+            """
+            INSERT INTO batches (id, name, description, last_refreshed_at, created_at, updated_at)
+            VALUES (%s, %s, %s, NOW(), NOW(), NOW())
+            """,
+            (batch_id, name, description),
+        )
+    conn.commit()
 
 
 def run_analyse(task_id: Optional[str] = None, config_json: Optional[str] = None):
@@ -327,6 +348,7 @@ def run_analyse(task_id: Optional[str] = None, config_json: Optional[str] = None
     logger.info("套利分析任务启动")
     conn = _build_db_conn(config.get("db", {}))
     try:
+        ensure_batch_exists(conn, batch_id)
         price_pairs = fetch_price_pairs(conn, strategy, start_ts, end_ts)
         opportunities = analyze_opportunities(price_pairs, strategy)
         save_results(

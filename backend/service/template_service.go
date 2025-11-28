@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -17,10 +18,11 @@ import (
 type TemplateService struct {
 	db          *gorm.DB
 	taskManager *TaskManager
+	dispatcher  TaskDispatcher
 }
 
-func NewTemplateService(db *gorm.DB, taskManager *TaskManager) *TemplateService {
-	return &TemplateService{db: db, taskManager: taskManager}
+func NewTemplateService(db *gorm.DB, taskManager *TaskManager, dispatcher TaskDispatcher) *TemplateService {
+	return &TemplateService{db: db, taskManager: taskManager, dispatcher: dispatcher}
 }
 
 func (s *TemplateService) CreateTemplate(ctx context.Context, name, taskType string, config datatypes.JSONMap) (*models.ParamTemplate, error) {
@@ -91,7 +93,17 @@ func (s *TemplateService) RunTemplate(ctx context.Context, templateID uint, over
 			return nil, err
 		}
 	}
-	return s.taskManager.CreateTask(ctx, template.TaskType, taskID, trigger, config)
+	task, err := s.taskManager.CreateTask(ctx, template.TaskType, taskID, trigger, config)
+	if err != nil {
+		return nil, err
+	}
+	if s.dispatcher != nil {
+		if err := s.dispatcher.Dispatch(context.Background(), task); err != nil {
+			log.Printf("dispatch task %s failed: %v", task.TaskID, err)
+			return task, err
+		}
+	}
+	return task, nil
 }
 
 func (s *TemplateService) ensureAnalyseConfig(ctx context.Context, config datatypes.JSONMap) (datatypes.JSONMap, error) {

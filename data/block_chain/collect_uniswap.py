@@ -9,9 +9,9 @@ import yaml
 from loguru import logger
 from psycopg2.extras import execute_values
 
-from task import check_task
+from .task import check_task, update_task_status
 
-with open("../config/config.yaml", "r", encoding="utf-8") as file:
+with open("config/config.yaml", "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)
 
 db_config = config.get("db", {})
@@ -59,7 +59,8 @@ def fetch_all_swaps(
         "Authorization": f"Bearer {graph_config['api_key']}",
         "Content-Type": "application/json",
     }
-    while True:
+    retry_count = 0
+    while retry_count < 3:
         if check_task(task_id):
             logger.info(f"任务 {task_id} 已取消，停止获取 Uniswap 数据")
             break
@@ -74,10 +75,12 @@ def fetch_all_swaps(
             swaps = response.json()["data"]["swaps"]
         except (requests.exceptions.RequestException, KeyError) as exc:
             logger.warning("请求失败: %s，5秒后重试...", exc)
+            retry_count += 1
             time.sleep(5)
             continue
         if not swaps:
             break
+        retry_count = 0
         all_swaps.extend(swaps)
         last_id = swaps[-1]["id"]
         logger.info(f"目前累计获取 {len(all_swaps)} 条记录...")
@@ -146,10 +149,13 @@ def collect_uniswap(
         if check_task(task_id):
             logger.info(f"任务 {task_id} 已取消，停止写入 Uniswap 数据")
             return 0
-        return process_and_store_uniswap_data(task_id, swaps)
+        rows_counter = process_and_store_uniswap_data(task_id, swaps)
+        update_task_status(task_id, 1)
+        return rows_counter
     except Exception as e:
         logger.error(f"获取Uniswap数据失败: {e}")
-        raise
+        update_task_status(task_id, 2)
+        return 0
 
 if __name__ == "__main__":
     collect_uniswap(3, "0x11b815efb8f581194ae79006d24e0d814b7697f6", 1756684800, 1759276799)

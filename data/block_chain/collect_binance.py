@@ -11,14 +11,14 @@ import psycopg2
 import yaml
 from loguru import logger
 
-from task import check_task
+from .task import check_task, update_task_status
 
 # 默认配置
-with open("../config/config.yaml", "r", encoding="utf-8") as file:
+with open("config/config.yaml", "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)
 
 db_config = config.get("db", {})
-csv_path = "../ETHUSDT-trades-2025-09.csv"
+csv_path = "ETHUSDT-trades-2025-09.csv"
 COLUMN_NAMES = ["id", "price", "qty", "quoteQty", "time", "isBuyerMaker", "isBestMatch"]
 DTYPE_MAP = {
     "id": "int64",
@@ -56,13 +56,15 @@ def count_lines(task_id: str, filepath: str) -> Optional[int]:
         return count
     except FileNotFoundError:
         logger.error(f"找不到CSV文件 '{filepath}'。请检查路径是否正确。")
-        return None
+        update_task_status(task_id, 2)
+        raise
     except Exception as e:
         logger.warning(f"估算行数失败: {e}. 无法按百分比导入。")
-        return None
-
+        update_task_status(task_id, 2)
+        raise
 
 def process_chunk(
+    task_id: str,
     chunk_data: pd.DataFrame,
     chunk_index: int,
     rows_counter,
@@ -70,7 +72,7 @@ def process_chunk(
 ):
     """
     描述：处理单个分块：预处理数据并写入数据库
-    参数：chunk_data: 分块数据, chunk_index: 分块索引, rows_counter: 计数器, target_rows: 目标行数
+    参数：task_id: 任务ID, chunk_data: 分块数据, chunk_index: 分块索引, rows_counter: 计数器, target_rows: 目标行数
     返回值：成功标志, 处理行数, 导入行数, 是否停止标志
     """
     original_chunk_len = len(chunk_data)
@@ -115,6 +117,7 @@ def process_chunk(
         return True, original_chunk_len, rows_imported, should_stop
     except Exception as e:
         logger.error(f"处理分块时发生意外错误: {e}")
+        update_task_status(task_id, 2)
         raise
 
 def import_data_to_database(task_id: str, target_rows: Optional[int], total_lines: Optional[int], chunk_size: int):
@@ -144,6 +147,7 @@ def import_data_to_database(task_id: str, target_rows: Optional[int], total_line
                 logger.info(f"任务 {task_id} 已取消，停止导入 Binance 数据")
                 break
             _, _, _, stop_flag = process_chunk(
+                task_id,
                 chunk,
                 i,
                 rows_counter,
@@ -157,9 +161,13 @@ def import_data_to_database(task_id: str, target_rows: Optional[int], total_line
                 break
     except FileNotFoundError:
         logger.error(f"找不到CSV文件 '{csv_path}'。请检查路径是否正确。")
+        update_task_status(task_id, 2)
+        raise
     except Exception as e:
         logger.error(f"处理文件时发生意外错误: {e}")
         traceback.print_exc(file=sys.stderr)
+        update_task_status(task_id, 2)
+        raise
     return rows_counter
 
 
@@ -188,9 +196,11 @@ def collect_binance(
             logger.info(f"任务 {task_id} 已取消，停止导入 Binance 数据")
             return 0
         logger.info(f"成功导入 {rows_counter[1]} 行，耗时 {total_time:.2f}s")
+        update_task_status(task_id, 1)
         return rows_counter[1]
     except Exception as e:
         logger.error(f"导入 Binance 数据失败: {e}")
+        update_task_status(task_id, 2)
         raise
 
 if __name__ == "__main__":

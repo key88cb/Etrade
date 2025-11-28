@@ -8,7 +8,6 @@ from . import (
     collect_binance,
     collect_uniswap,
     process_prices,
-    task_client,
 )
 
 __all__ = [
@@ -17,5 +16,4 @@ __all__ = [
     "collect_binance",
     "collect_uniswap",
     "process_prices",
-    "task_client",
 ]

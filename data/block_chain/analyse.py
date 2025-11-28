@@ -7,7 +7,7 @@ import yaml
 from loguru import logger
 from psycopg2.extras import Json, execute_values
 
-from .task_client import TaskClient, load_config_from_string
+from .utils import load_config_from_string
 
 # 默认策略参数
 DEFAULT_STRATEGY = {
@@ -312,7 +312,6 @@ def save_results(
 
 def run_analyse(task_id: Optional[str] = None, config_json: Optional[str] = None):
     config = load_config_from_string(config_json)
-    client = TaskClient(task_id)
     strategy = DEFAULT_STRATEGY.copy()
     strategy.update(config.get("strategy", {}))
     batch_id = int(config.get("batch_id", 1))
@@ -325,7 +324,7 @@ def run_analyse(task_id: Optional[str] = None, config_json: Optional[str] = None
     if start_ts and end_ts and start_ts > end_ts:
         raise ValueError("start 必须早于 end")
 
-    client.update_status("running", "套利分析任务启动")
+    logger.info("套利分析任务启动")
     conn = _build_db_conn(config.get("db", {}))
     try:
         price_pairs = fetch_price_pairs(conn, strategy, start_ts, end_ts)
@@ -335,11 +334,11 @@ def run_analyse(task_id: Optional[str] = None, config_json: Optional[str] = None
         )
     except Exception as exc:
         conn.rollback()
-        client.update_status("failed", f"分析失败: {exc}")
+        logger.error(f"分析失败: {exc}")
         conn.close()
         raise
     else:
-        client.update_status("success", f"分析完成，发现 {len(opportunities)} 条机会")
+        logger.info(f"分析完成，发现 {len(opportunities)} 条机会")
         conn.close()
 
 

@@ -4,21 +4,21 @@ import math
 import sys
 import time
 import traceback
-from typing import Any, Optional
+from typing import Optional
 
 import pandas as pd
 import psycopg2
 import yaml
 from loguru import logger
 
-from .task import check_task, update_task_status
+from task import check_task, update_task_status
 
 # 默认配置
-with open("config/config.yaml", "r", encoding="utf-8") as file:
+with open("../config/config.yaml", "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)
 
 db_config = config.get("db", {})
-csv_path = "ETHUSDT-trades-2025-09.csv"
+csv_path = "../ETHUSDT-trades-2025-09.csv"
 COLUMN_NAMES = ["id", "price", "qty", "quoteQty", "time", "isBuyerMaker", "isBestMatch"]
 DTYPE_MAP = {
     "id": "int64",

@@ -1,6 +1,5 @@
 import time
-from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable
 
 import pandas as pd
 import psycopg2
@@ -11,7 +10,7 @@ from psycopg2.extras import execute_values
 
 from .task import check_task, update_task_status
 
-with open("config/config.yaml", "r", encoding="utf-8") as file:
+with open("../config/config.yaml", "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)
 
 db_config = config.get("db", {})

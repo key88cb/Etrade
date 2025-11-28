@@ -1,3 +1,5 @@
+import datetime
+import json
 import os
 import threading
 from concurrent import futures
@@ -10,7 +12,7 @@ from protos.task_pb2 import TaskResponse, TaskStatus
 from protos.task_pb2_grpc import TaskServiceServicer, add_TaskServiceServicer_to_server
 
 # 导入数据收集模块
-from block_chain import collect_binance, collect_uniswap
+from block_chain import collect_binance, collect_uniswap, process_prices, analyse
 
 
 class TaskService(TaskServiceServicer):
@@ -86,6 +88,127 @@ class TaskService(TaskServiceServicer):
                     end_ts=end_ts,
                 )
                 logger.info(f"任务 {task_id} 执行成功: 收集 Uniswap 数据")
+            except Exception as e:
+                logger.error(f"任务 {task_id} 执行失败: {e}")
+
+        # 在后台线程中启动任务
+        thread = threading.Thread(target=run_task, daemon=True)
+        thread.start()
+
+        # 立即返回运行状态
+        return TaskResponse(
+            task_id=task_id,
+            status=TaskStatus.TASK_STATUS_RUNNING,
+        )
+
+    def ProcessPrices(self, request, context):
+        """
+        处理价格数据
+        在后台线程中执行任务，立即返回运行状态
+        """
+        task_id = request.task_id
+        start_date = request.start_date
+        end_date = request.end_date
+        aggregation_interval = request.aggregation_interval
+        overwrite = request.overwrite
+        db_overrides = dict(request.db_overrides)
+
+        logger.info(
+            f"收到处理价格数据请求: task_id={task_id}, "
+            f"start_date={start_date}, end_date={end_date}, "
+            f"aggregation_interval={aggregation_interval}, overwrite={overwrite}"
+        )
+
+        def run_task():
+            """在后台线程中执行任务"""
+            try:
+                logger.info(f"开始执行任务 {task_id}: 处理价格数据")
+                
+                # 将 int32 时间戳转换为日期字符串
+                # 假设 start_date 和 end_date 是 Unix 时间戳（秒）
+                start_date_str = None
+                end_date_str = None
+                
+                if start_date:
+                    dt = datetime.datetime.fromtimestamp(start_date, tz=datetime.timezone.utc)
+                    start_date_str = dt.strftime("%Y-%m-%d")
+                
+                if end_date:
+                    dt = datetime.datetime.fromtimestamp(end_date, tz=datetime.timezone.utc)
+                    end_date_str = dt.strftime("%Y-%m-%d")
+                
+                # 准备参数
+                kwargs = {
+                    "aggregation_interval": aggregation_interval if aggregation_interval else "minute",
+                    "overwrite": overwrite,
+                    "start_date": start_date_str,
+                    "end_date": end_date_str,
+                }
+                
+                # 合并 db_overrides（如果有）
+                if db_overrides:
+                    kwargs.update(db_overrides)
+                
+                process_prices.run_process_prices(
+                    task_id=task_id,
+                    **kwargs
+                )
+                logger.info(f"任务 {task_id} 执行成功: 处理价格数据")
+            except Exception as e:
+                logger.error(f"任务 {task_id} 执行失败: {e}")
+
+        # 在后台线程中启动任务
+        thread = threading.Thread(target=run_task, daemon=True)
+        thread.start()
+
+        # 立即返回运行状态
+        return TaskResponse(
+            task_id=task_id,
+            status=TaskStatus.TASK_STATUS_RUNNING,
+        )
+
+    def Analyse(self, request, context):
+        """
+        分析数据
+        在后台线程中执行任务，立即返回运行状态
+        """
+        task_id = request.task_id
+        batch_id = request.batch_id
+        overwrite = request.overwrite
+        strategy_json = request.strategy_json
+
+        logger.info(
+            f"收到分析数据请求: task_id={task_id}, "
+            f"batch_id={batch_id}, overwrite={overwrite}"
+        )
+
+        def run_task():
+            """在后台线程中执行任务"""
+            try:
+                logger.info(f"开始执行任务 {task_id}: 分析数据")
+                
+                # 解析策略 JSON
+                strategy_params = {}
+                if strategy_json:
+                    try:
+                        strategy_params = json.loads(strategy_json)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"解析策略 JSON 失败: {e}")
+                        raise ValueError(f"无效的策略 JSON: {e}")
+                
+                # 准备参数：先合并所有策略参数，然后添加控制参数
+                kwargs = {}
+                # 合并策略参数（所有策略参数都可以传入）
+                kwargs.update(strategy_params)
+                # 添加控制参数
+                kwargs["batch_id"] = batch_id
+                kwargs["overwrite"] = overwrite  # overwrite=True 时重建表，overwrite=False 时追加数据
+                
+                analyse.run_analyse(
+                    task_id=task_id,
+                    **kwargs
+                )
+                logger.info(f"任务 {task_id} 执行成功: 分析数据")
             except Exception as e:
                 logger.error(f"任务 {task_id} 执行失败: {e}")
 

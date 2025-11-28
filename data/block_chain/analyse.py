@@ -7,7 +7,7 @@ import yaml
 from loguru import logger
 from psycopg2.extras import Json, execute_values
 
-from task_client import TaskClient, load_config_from_string
+from .utils import load_config_from_string
 
 # 默认策略参数
 DEFAULT_STRATEGY = {
@@ -44,6 +44,35 @@ def _parse_timestamp(value: Optional[str]) -> Optional[pd.Timestamp]:
     if not value:
         return None
     return pd.to_datetime(value, utc=True, errors="raise")
+
+
+def parse_cli_args(
+    argv: Optional[list[str]] = None,
+) -> Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp]]:
+    """
+    描述：解析命令行参数，返回起止时间戳
+    参数：argv: 自定义参数列表，测试时可注入；默认读取 sys.argv
+    返回值：(start_timestamp, end_timestamp)
+    """
+    parser = argparse.ArgumentParser(
+        description="从数据库中筛选指定时间范围的交易数据并执行套利分析。",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--start", type=str, help="起始时间 (ISO8601，如 2025-09-01T00:00:00Z)"
+    )
+    parser.add_argument(
+        "--end", type=str, help="结束时间 (ISO8601，如 2025-09-07T23:59:59Z)"
+    )
+    args = parser.parse_args(argv)
+
+    start_ts = _parse_timestamp(args.start)
+    end_ts = _parse_timestamp(args.end)
+
+    if start_ts and end_ts and start_ts > end_ts:
+        parser.error("start 时间必须早于 end 时间。")
+
+    return start_ts, end_ts
 
 
 def fetch_price_pairs(
@@ -121,7 +150,9 @@ def fetch_price_pairs(
     return price_pairs
 
 
-def calculate_profit_buy_cex_sell_dex(strategy: dict[str, Any], price_cex, price_dex, gas_price):
+def calculate_profit_buy_cex_sell_dex(
+    strategy: dict[str, Any], price_cex, price_dex, gas_price
+):
     investment = strategy["initial_investment"]
     binance_fee = strategy["binance_fee_rate"]
     uniswap_fee = strategy["uniswap_fee_rate"]
@@ -139,7 +170,9 @@ def calculate_profit_buy_cex_sell_dex(strategy: dict[str, Any], price_cex, price
     return net_profit
 
 
-def calculate_profit_buy_dex_sell_cex(strategy: dict[str, Any], price_dex, price_cex, gas_price):
+def calculate_profit_buy_dex_sell_cex(
+    strategy: dict[str, Any], price_dex, price_cex, gas_price
+):
     investment = strategy["initial_investment"]
     binance_fee = strategy["binance_fee_rate"]
     uniswap_fee = strategy["uniswap_fee_rate"]
@@ -174,7 +207,9 @@ def analyze_opportunities(price_pairs: list, strategy: dict[str, Any]):
             continue
 
         if uniswap_price > binance_price and binance_price != 0:
-            profit = calculate_profit_buy_cex_sell_dex(strategy, binance_price, uniswap_price, gas_price)
+            profit = calculate_profit_buy_cex_sell_dex(
+                strategy, binance_price, uniswap_price, gas_price
+            )
             if profit > threshold:
                 profitable_trades.append(
                     {
@@ -187,7 +222,9 @@ def analyze_opportunities(price_pairs: list, strategy: dict[str, Any]):
                     }
                 )
         elif binance_price > uniswap_price and uniswap_price != 0:
-            profit = calculate_profit_buy_dex_sell_cex(strategy, uniswap_price, binance_price, gas_price)
+            profit = calculate_profit_buy_dex_sell_cex(
+                strategy, uniswap_price, binance_price, gas_price
+            )
             if profit > threshold:
                 profitable_trades.append(
                     {
@@ -231,7 +268,9 @@ def save_results(
             )
         elif not append:
             logger.info("清理批次 %s 旧数据", batch_id)
-            cur.execute("DELETE FROM arbitrage_opportunities WHERE batch_id = %s", (batch_id,))
+            cur.execute(
+                "DELETE FROM arbitrage_opportunities WHERE batch_id = %s", (batch_id,)
+            )
 
         if not results:
             conn.commit()
@@ -242,7 +281,9 @@ def save_results(
         records = []
         for item in results:
             details = {
-                "block_time": item["block_time"].isoformat() if item.get("block_time") else None,
+                "block_time": (
+                    item["block_time"].isoformat() if item.get("block_time") else None
+                ),
                 "experiment_id": experiment_id,
             }
             records.append(
@@ -271,7 +312,6 @@ def save_results(
 
 def run_analyse(task_id: Optional[str] = None, config_json: Optional[str] = None):
     config = load_config_from_string(config_json)
-    client = TaskClient(task_id)
     strategy = DEFAULT_STRATEGY.copy()
     strategy.update(config.get("strategy", {}))
     batch_id = int(config.get("batch_id", 1))
@@ -284,19 +324,21 @@ def run_analyse(task_id: Optional[str] = None, config_json: Optional[str] = None
     if start_ts and end_ts and start_ts > end_ts:
         raise ValueError("start 必须早于 end")
 
-    client.update_status("running", "套利分析任务启动")
+    logger.info("套利分析任务启动")
     conn = _build_db_conn(config.get("db", {}))
     try:
         price_pairs = fetch_price_pairs(conn, strategy, start_ts, end_ts)
         opportunities = analyze_opportunities(price_pairs, strategy)
-        save_results(conn, opportunities, batch_id, append, rebuild_table, experiment_id)
+        save_results(
+            conn, opportunities, batch_id, append, rebuild_table, experiment_id
+        )
     except Exception as exc:
         conn.rollback()
-        client.update_status("failed", f"分析失败: {exc}")
+        logger.error(f"分析失败: {exc}")
         conn.close()
         raise
     else:
-        client.update_status("success", f"分析完成，发现 {len(opportunities)} 条机会")
+        logger.info(f"分析完成，发现 {len(opportunities)} 条机会")
         conn.close()
 
 

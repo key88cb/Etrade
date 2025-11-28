@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package task.v1;
+
+// TaskService 定义了任务执行与管理的 RPC 接口。
+service TaskService {
+  // 收集币安数据
+  rpc CollectBinance(CollectBinanceRequest) returns (TaskResponse);
+  // 收集Uniswap数据
+  rpc CollectUniswap(CollectUniswapRequest) returns (TaskResponse);
+  // 处理价格数据
+  rpc ProcessPrices(ProcessPricesRequest) returns (TaskResponse);
+  // 分析数据
+  rpc Analyse(AnalyseRequest) returns (TaskResponse);
+}
+
+// TaskStatus 定义任务的可能状态。
+enum TaskStatus {
+  TASK_STATUS_RUNNING = 0;     // 任务正在执行中
+  TASK_STATUS_SUCCESS = 1;     // 任务成功完成
+  TASK_STATUS_FAILED = 2;      // 任务执行失败
+  TASK_STATUS_CANCELED = 3;    // 任务被取消
+}
+
+message CollectBinanceRequest {
+  string task_id = 1;         // 任务的唯一标识符
+  int32 import_percentage = 2; // 导入百分比
+  int32 chunk_size = 3;        // 分块大小
+}
+
+message CollectUniswapRequest {
+  string task_id = 1;         // 任务的唯一标识符
+  string pool_address = 2;    // 池地址
+  int32 start_ts = 3;         // 起始时间
+  int32 end_ts = 4;           // 终止时间
+}
+
+message ProcessPricesRequest {
+  string task_id = 1;         // 任务的唯一标识符
+  int32 start_date = 2;         // 起始时间
+  int32 end_date = 3;           // 终止时间
+  string aggregation_interval = 4; // 聚合间隔
+  bool overwrite = 5; // 是否覆盖
+  map<string, string> db_overrides = 6; // 策略参数
+}
+
+message AnalyseRequest {
+  string task_id = 1;       // 任务的唯一标识符
+  int32 batch_id = 2;       // 批次ID
+  bool overwrite = 3;       // 是否覆盖
+  string strategy_json = 4; // 策略参数
+}
+
+message TaskResponse {
+  string task_id = 1;         // 任务的唯一标识符
+  TaskStatus status = 2;      // 任务的最终状态
+}

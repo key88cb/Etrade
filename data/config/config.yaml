@@ -1,7 +1,7 @@
 db:
   host: localhost
   port: 5432
-  database: etrade
+  database: test_etrade
   username: postgres
   password: 123456
 

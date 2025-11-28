@@ -20,6 +20,7 @@ interface Props {
 
 interface ApiOpportunity {
   id: number;
+  batch_id?: number;
   buy_platform: string;
   sell_platform: string;
   buy_price: number;
@@ -27,35 +28,66 @@ interface ApiOpportunity {
   profit_usdt: number;
 }
 
-interface PaginationData {
-  total: number;
-  page: number;
-  limit: number;
+interface Batch {
+  id: number;
+  name: string;
+  description?: string;
+  last_refreshed_at?: string;
 }
 
 const props = defineProps<Props>();
 
-const currentPage = ref(1);
 const itemsPerPage = 10;
+const currentPage = ref(1);
 const sortField = ref<SortField>('netProfit');
 const sortDirection = ref<SortDirection>('desc');
 const opportunities = ref<ApiOpportunity[]>([]);
-const pagination = ref<PaginationData>({ total: 0, page: 1, limit: itemsPerPage });
+const opportunitiesLoaded = ref(false);
 const isLoading = ref(false);
 const errorMessage = ref('');
 const unsupportedNotice = ref('');
-
-const sortFieldMapping: Record<SortField, string | null> = {
-  timestamp: null,
-  grossProfit: null,
-  netProfit: 'profit_usdt',
-};
+const batches = ref<Batch[]>([]);
+const batchesLoading = ref(false);
+const batchError = ref('');
+const openedBatchIds = ref<number[]>([]);
 
 const isDark = computed(() => props.theme === 'dark');
 
+const filteredOpportunities = computed(() => {
+  if (!openedBatchIds.value.length) return [];
+  return opportunities.value.filter(
+    (item) => typeof item.batch_id === 'number' && openedBatchIds.value.includes(item.batch_id),
+  );
+});
+
+const sortedFilteredOpportunities = computed(() => {
+  const list = [...filteredOpportunities.value];
+  if (sortField.value === 'netProfit') {
+    list.sort((a, b) => {
+      const diff = (a.profit_usdt ?? 0) - (b.profit_usdt ?? 0);
+      return sortDirection.value === 'asc' ? diff : -diff;
+    });
+  }
+  return list;
+});
+
+const paginatedOpportunities = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage;
+  return sortedFilteredOpportunities.value.slice(start, start + itemsPerPage);
+});
+
+const filteredTotal = computed(() => sortedFilteredOpportunities.value.length);
+
+const totalPages = computed(() => {
+  if (!filteredTotal.value) {
+    return 1;
+  }
+  return Math.max(1, Math.ceil(filteredTotal.value / itemsPerPage));
+});
+
 const stats = computed(() => {
-  const profits = opportunities.value.map((item) => item.profit_usdt ?? 0);
-  const total = pagination.value.total;
+  const profits = filteredOpportunities.value.map((item) => item.profit_usdt ?? 0);
+  const total = filteredTotal.value;
   const maxProfit = profits.length ? Math.max(...profits) : 0;
   const totalProfit = profits.reduce((sum, value) => sum + value, 0);
   const avgProfit = profits.length ? totalProfit / profits.length : 0;
@@ -68,63 +100,89 @@ const stats = computed(() => {
   };
 });
 
-const fetchOpportunities = async () => {
+const fetchBatches = async () => {
+  batchesLoading.value = true;
+  batchError.value = '';
+  try {
+    const { data } = await api.getBatches();
+    batches.value = data?.data ?? data ?? [];
+  } catch (error: any) {
+    batchError.value = error?.message ?? '批次列表获取失败';
+  } finally {
+    batchesLoading.value = false;
+  }
+};
+
+const fetchAllOpportunities = async () => {
   isLoading.value = true;
   errorMessage.value = '';
-
   try {
-    const { data } = await api.getOpportunities({
-      page: currentPage.value,
-      limit: itemsPerPage,
-      sort_by: sortFieldMapping[sortField.value] ?? undefined,
-      order: sortDirection.value,
-    });
-    const payload = data?.data;
-    opportunities.value = payload?.items ?? [];
-    pagination.value = payload?.pagination ?? {
-      total: opportunities.value.length,
-      page: currentPage.value,
-      limit: itemsPerPage,
-    };
+    const aggregated: ApiOpportunity[] = [];
+    const pageSize = 200;
+    let page = 1;
+    let total = Number.POSITIVE_INFINITY;
+
+    while (aggregated.length < total) {
+      const { data } = await api.getOpportunities({
+        page,
+        limit: pageSize,
+        sort_by: 'profit_usdt',
+        order: 'desc',
+      });
+      const payload = data?.data;
+      const items: ApiOpportunity[] = payload?.items ?? [];
+      const pagination = payload?.pagination;
+      if (pagination?.total) {
+        total = pagination.total;
+      }
+      aggregated.push(...items);
+      if (!items.length || aggregated.length >= total) {
+        break;
+      }
+      page += 1;
+    }
+    opportunities.value = aggregated;
+    opportunitiesLoaded.value = true;
   } catch (error: any) {
-    console.error(error);
-    errorMessage.value =
-      error?.message ?? error?.data?.message ?? '套利机会列表获取失败';
-    opportunities.value = [];
-    pagination.value = { total: 0, page: 1, limit: itemsPerPage };
+    errorMessage.value = error?.message ?? '套利机会列表获取失败';
   } finally {
     isLoading.value = false;
   }
 };
 
-onMounted(fetchOpportunities);
+const ensureOpportunitiesLoaded = async () => {
+  if (opportunitiesLoaded.value || isLoading.value) return;
+  await fetchAllOpportunities();
+};
 
-watch([currentPage, sortField, sortDirection], () => {
-  fetchOpportunities();
-});
+const isBatchOpened = (id: number) => openedBatchIds.value.includes(id);
+
+const toggleBatch = async (batchId: number) => {
+  if (isBatchOpened(batchId)) {
+    openedBatchIds.value = openedBatchIds.value.filter((id) => id !== batchId);
+    return;
+  }
+  await ensureOpportunitiesLoaded();
+  openedBatchIds.value = [...openedBatchIds.value, batchId];
+};
+
+const openedBatches = computed(() =>
+  batches.value.filter((batch) => openedBatchIds.value.includes(batch.id)),
+);
 
 const handleSort = (field: SortField) => {
   unsupportedNotice.value = '';
-  if (!sortFieldMapping[field]) {
-    unsupportedNotice.value = '后端暂未提供该字段，无法排序。';
+  if (field !== 'netProfit') {
+    unsupportedNotice.value = '暂不支持该排序字段';
     return;
   }
-
-  if (sortField.value === field) {
-    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
-  } else {
-    sortField.value = field;
-    sortDirection.value = 'desc';
-  }
+  sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc';
 };
 
 const goToPage = (page: number) => {
-  currentPage.value = Math.min(Math.max(page, 1), totalPages.value);
+  const capped = Math.min(Math.max(page, 1), totalPages.value);
+  currentPage.value = capped;
 };
-
-const totalPages = computed(() => {
-  return Math.max(1, Math.ceil(pagination.value.total / itemsPerPage));
-});
 
 const paginationRange = computed(() => {
   const pages = totalPages.value;
@@ -149,12 +207,116 @@ const paginationRange = computed(() => {
   ];
 });
 
+const showingRange = computed(() => {
+  if (!filteredTotal.value) {
+    return { start: 0, end: 0 };
+  }
+  const start = (currentPage.value - 1) * itemsPerPage + 1;
+  const end = Math.min(currentPage.value * itemsPerPage, filteredTotal.value);
+  return { start, end };
+});
+
 const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
+
+onMounted(() => {
+  fetchBatches();
+});
+
+watch(filteredOpportunities, () => {
+  currentPage.value = 1;
+});
+
+watch(
+  () => totalPages.value,
+  (pages) => {
+    if (currentPage.value > pages) {
+      currentPage.value = pages;
+    }
+  },
+);
 </script>
 
 <template>
   <div class="space-y-4">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div
+      class="rounded-md border p-4"
+      :class="isDark ? 'bg-[#161b22] border-[#30363d]' : 'bg-white border-[#d0d7de]'"
+    >
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <h3 class="text-sm font-semibold" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">批次筛选</h3>
+          <p class="text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+            先选择一个或多个批次后再加载套利机会，可以随时关闭批次以清空视图。
+          </p>
+        </div>
+        <button
+          type="button"
+          class="text-xs px-3 py-1 rounded border"
+          :class="
+            isDark
+              ? 'border-[#30363d] text-[#7d8590] hover:text-[#58a6ff] hover:border-[#58a6ff]'
+              : 'border-[#d0d7de] text-[#57606a] hover:text-[#0969da] hover:border-[#0969da]'
+          "
+          @click="fetchBatches"
+          :disabled="batchesLoading"
+        >
+          {{ batchesLoading ? '加载中...' : '刷新批次' }}
+        </button>
+      </div>
+      <p v-if="batchError" class="text-xs text-[#f85149] mb-2">{{ batchError }}</p>
+      <div class="flex flex-wrap gap-2 mb-3" v-if="batches.length">
+        <button
+          v-for="batch in batches"
+          :key="batch.id"
+          type="button"
+          class="px-3 py-1 rounded text-xs border transition-colors"
+          :class="
+            isBatchOpened(batch.id)
+              ? 'bg-[#1f6feb] border-[#1f6feb] text-white'
+              : isDark
+                ? 'border-[#30363d] text-[#7d8590] hover:text-[#58a6ff] hover:border-[#58a6ff]'
+                : 'border-[#d0d7de] text-[#57606a] hover:text-[#0969da] hover:border-[#0969da]'
+          "
+          @click="toggleBatch(batch.id)"
+        >
+          {{ batch.name }} (#{{ batch.id }})
+        </button>
+      </div>
+      <p v-else-if="!batchesLoading" class="text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+        暂无批次，先通过数据管理页面创建。
+      </p>
+      <div v-if="openedBatches.length" class="flex flex-wrap gap-2 text-xs">
+        <span :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">已打开批次：</span>
+        <button
+          v-for="batch in openedBatches"
+          :key="`opened-${batch.id}`"
+          type="button"
+          class="px-2 py-1 rounded-full border flex items-center gap-1"
+          :class="isDark ? 'border-[#30363d] text-[#e6edf3]' : 'border-[#d0d7de] text-[#24292f]'"
+          @click="toggleBatch(batch.id)"
+        >
+          {{ batch.name }} (#{{ batch.id }})
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+            class="w-3 h-3"
+            fill="none"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <p v-else class="text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+        暂未选择批次。
+      </p>
+    </div>
+
+    <div
+      v-if="openedBatchIds.length"
+      class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+    >
       <div
         class="rounded-md border p-4"
         :class="isDark ? 'bg-[#161b22] border-[#30363d]' : 'bg-white border-[#d0d7de]'"
@@ -282,24 +444,29 @@ const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
             </tr>
           </thead>
           <tbody>
-            <tr v-if="isLoading">
+            <tr v-if="!openedBatchIds.length">
+              <td colspan="6" class="px-4 py-6 text-center text-sm" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+                请选择左侧批次以查看套利数据。
+              </td>
+            </tr>
+            <tr v-else-if="isLoading">
               <td colspan="6" class="px-4 py-6 text-center">
                 <Loader2 class="w-4 h-4 inline-block animate-spin mr-2 text-[#58a6ff]" />
                 <span :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">加载中...</span>
               </td>
             </tr>
             <tr
-              v-else-if="!opportunities.length"
+              v-else-if="!filteredTotal"
               :class="['border-b', isDark ? 'border-[#21262d]' : 'border-[#d0d7de]']"
             >
               <td colspan="6" class="px-4 py-6 text-center text-sm" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
-                暂无数据，确认后端是否已生成套利机会。
+                所选批次暂未生成套利机会。
               </td>
             </tr>
             <tr
               v-else
-              v-for="opportunity in opportunities"
-              :key="opportunity.id"
+              v-for="opportunity in paginatedOpportunities"
+              :key="`${opportunity.batch_id}-${opportunity.id}`"
               :class="[
                 'border-b transition-colors',
                 isDark ? 'border-[#21262d] hover:bg-[#0d1117]' : 'border-[#d0d7de] hover:bg-[#f6f8fa]',
@@ -333,12 +500,7 @@ const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
         :class="isDark ? 'border-[#30363d] bg-[#0d1117]' : 'border-[#d0d7de] bg-[#f6f8fa]'"
       >
           <div class="text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
-            Showing
-            {{
-              Math.min((currentPage - 1) * itemsPerPage + 1, pagination.total === 0 ? 0 : pagination.total)
-            }}-
-            {{ Math.min(currentPage * itemsPerPage, pagination.total) }}
-            of {{ pagination.total }}
+            Showing {{ showingRange.start }}-{{ showingRange.end }} of {{ filteredTotal }}
           </div>
           <div class="flex items-center gap-1">
             <button
@@ -349,7 +511,7 @@ const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
                 ? 'border-[#30363d] text-[#7d8590] hover:text-[#58a6ff] hover:border-[#58a6ff]'
                 : 'border-[#d0d7de] text-[#57606a] hover:text-[#0969da] hover:border-[#0969da]'
             "
-            :disabled="currentPage === 1"
+            :disabled="currentPage === 1 || !filteredTotal"
             @click="goToPage(currentPage - 1)"
           >
             <ChevronLeft class="w-4 h-4" />
@@ -379,7 +541,7 @@ const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
                 ? 'border-[#30363d] text-[#7d8590] hover:text-[#58a6ff] hover:border-[#58a6ff]'
                 : 'border-[#d0d7de] text-[#57606a] hover:text-[#0969da] hover:border-[#0969da]'
             "
-            :disabled="currentPage === totalPages"
+              :disabled="currentPage === totalPages || !filteredTotal"
             @click="goToPage(currentPage + 1)"
           >
             <ChevronRight class="w-4 h-4" />

@@ -42,13 +42,32 @@
               <template #renderItem="{ item }">
                 <a-list-item
                   class="batch-item"
-                  :class="{ active: activeBatch && activeBatch.id === item.id }"
-                  @click="selectBatch(item)"
+                  :class="{ active: isBatchOpened(item.id) }"
                 >
-                  <div>
-                    <div class="batch-name">{{ item.name }}</div>
+                  <div class="batch-info" @click="toggleBatch(item)">
+                    <div class="batch-name">
+                      {{ item.name }}
+                      <a-tag
+                        v-if="isBatchOpened(item.id)"
+                        color="green"
+                        :bordered="false"
+                        style="margin-left: 8px"
+                      >
+                        已打开
+                      </a-tag>
+                    </div>
                     <div class="batch-meta">ID: {{ item.id }}</div>
                     <div class="batch-meta">刷新：{{ item.last_refreshed_at ?? '尚未刷新' }}</div>
+                  </div>
+                  <div class="batch-actions">
+                    <a-button
+                      type="primary"
+                      size="small"
+                      ghost
+                      @click.stop="toggleBatch(item)"
+                    >
+                      {{ isBatchOpened(item.id) ? '关闭批次' : '打开批次' }}
+                    </a-button>
                   </div>
                 </a-list-item>
               </template>
@@ -62,7 +81,7 @@
                   v-model:value="reportForm.batch_id"
                   :min="1"
                   style="width: 100%"
-                  :placeholder="activeBatch ? String(activeBatch.id) : '请输入批次 ID'"
+                  :placeholder="reportBatchPlaceholder"
                 />
               </a-form-item>
               <a-form-item label="模板 ID">
@@ -84,19 +103,39 @@
 
         <a-col :xs="24" :lg="18">
           <div class="active-batch-header">
-            <div v-if="activeBatch">
-              <h3>{{ activeBatch.name }}</h3>
+            <div>
+              <h3>批次概览</h3>
               <p class="text-sm text-gray-500">
-                {{ activeBatch.description || '暂无描述' }} · 最近刷新：{{ activeBatch.last_refreshed_at ?? '尚未刷新' }}
+                从左侧打开一个或多个批次，可随时关闭；下面的表格将聚合所有已打开批次的套利机会。
               </p>
             </div>
-            <div v-else class="text-sm text-gray-500">请选择一个批次以查看套利机会</div>
             <div class="actions">
               <a-button size="small" @click="fetchBatches">刷新批次</a-button>
-              <a-button size="small" type="primary" ghost @click="activeBatch && fetchReports(activeBatch.id)">
+              <a-button
+                size="small"
+                type="primary"
+                ghost
+                :disabled="!reportForm.batch_id"
+                @click="reportForm.batch_id && fetchReports(reportForm.batch_id)"
+              >
                 刷新报告
               </a-button>
             </div>
+          </div>
+
+          <div v-if="openedBatches.length" class="opened-tags">
+            <a-tag
+              v-for="batch in openedBatches"
+              :key="batch.id"
+              color="blue"
+              closable
+              @close.prevent.stop="closeBatch(batch.id)"
+            >
+              {{ batch.name }} (#{{ batch.id }})
+            </a-tag>
+          </div>
+          <div v-else class="text-sm text-gray-500 mb-4">
+            暂未选择批次，请在左侧批次列表中点击打开。
           </div>
 
           <a-row :gutter="16" class="stats-row" v-if="!loading">
@@ -155,15 +194,19 @@
               showQuickJumper: true,
               showTotal: (total: number) => `共 ${total} 条记录`,
             }"
-            :row-key="(record: Opportunity) => record.id"
+            :row-key="rowKey"
             :locale="{
-              emptyText: activeBatch ? '该批次暂未产生机会数据' : '请选择批次以查看数据',
+              emptyText: openedBatchIds.length ? '所选批次暂未产生机会数据' : '请选择批次以查看数据',
             }"
             class="opportunities-table"
           >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'id'">
                 <a-tag color="processing">{{ record.id }}</a-tag>
+              </template>
+              
+              <template v-else-if="column.key === 'batch_id'">
+                <a-tag>{{ record.batch_id ?? '-' }}</a-tag>
               </template>
               
               <template v-else-if="column.key === 'buy_platform'">
@@ -204,6 +247,11 @@
           </a-table>
 
           <a-card class="mt-4" title="报告列表" size="small">
+            <template #extra>
+              <span class="text-xs text-gray-500">
+                {{ reportForm.batch_id ? `批次 ${reportForm.batch_id}` : '未选择批次' }}
+              </span>
+            </template>
             <a-table
               :columns="reportColumns"
               :data-source="reports"
@@ -220,7 +268,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, reactive } from 'vue';
+import { ref, onMounted, computed, reactive, watch } from 'vue';
 import api from '../api';
 import {
   DollarOutlined,
@@ -266,6 +314,14 @@ const columns = [
     key: 'id',
     width: 80,
     align: 'center' as const,
+  },
+  {
+    title: '批次',
+    dataIndex: 'batch_id',
+    key: 'batch_id',
+    width: 90,
+    align: 'center' as const,
+    sorter: (a: Opportunity, b: Opportunity) => (a.batch_id ?? 0) - (b.batch_id ?? 0),
   },
   {
     title: '买入平台',
@@ -319,7 +375,7 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const batches = ref<Batch[]>([]);
 const batchesLoading = ref(false);
-const activeBatchId = ref<number | null>(null);
+const openedBatchIds = ref<number[]>([]);
 const reports = ref<ReportItem[]>([]);
 const reportLoading = ref(false);
 const reportForm = reactive({
@@ -330,7 +386,7 @@ const reportForm = reactive({
 
 const maxProfit = computed(() => {
   if (opportunities.value.length === 0) return 0;
-  return Math.max(...opportunities.value.map(opp => opp.profit_usdt));
+  return Math.max(...opportunities.value.map((opp) => opp.profit_usdt));
 });
 
 const avgProfit = computed(() => {
@@ -339,10 +395,77 @@ const avgProfit = computed(() => {
   return sum / opportunities.value.length;
 });
 
-const activeBatch = computed(() => {
-  if (!activeBatchId.value) return null;
-  return batches.value.find((batch) => batch.id === activeBatchId.value) ?? null;
+const openedBatches = computed(() =>
+  batches.value.filter((batch) => openedBatchIds.value.includes(batch.id)),
+);
+
+const lastOpenedBatchId = computed(() => {
+  if (!openedBatchIds.value.length) return null;
+  return openedBatchIds.value[openedBatchIds.value.length - 1];
 });
+
+const reportBatchPlaceholder = computed(() => {
+  if (lastOpenedBatchId.value) {
+    return `默认批次 ${lastOpenedBatchId.value}`;
+  }
+  return '请输入批次 ID';
+});
+
+const rowKey = (record: Opportunity) => `${record.batch_id ?? 'N/A'}-${record.id}`;
+
+const isBatchOpened = (batchId: number) => openedBatchIds.value.includes(batchId);
+
+const applyBatchFilter = () => {
+  const ids = openedBatchIds.value;
+  if (!ids.length) {
+    opportunities.value = [];
+    return;
+  }
+  opportunities.value = allOpportunities.value.filter(
+    (opp) => typeof opp.batch_id === 'number' && ids.includes(opp.batch_id),
+  );
+};
+
+const openBatch = (batchId: number) => {
+  if (!isBatchOpened(batchId)) {
+    openedBatchIds.value.push(batchId);
+  }
+  reportForm.batch_id = batchId;
+  applyBatchFilter();
+};
+
+const closeBatch = (batchId: number) => {
+  const idx = openedBatchIds.value.indexOf(batchId);
+  if (idx !== -1) {
+    openedBatchIds.value.splice(idx, 1);
+  }
+  if (openedBatchIds.value.length === 0) {
+    opportunities.value = [];
+  } else {
+    applyBatchFilter();
+  }
+  if (reportForm.batch_id === batchId) {
+    const fallback = openedBatchIds.value[openedBatchIds.value.length - 1] ?? null;
+    reportForm.batch_id = fallback;
+  }
+};
+
+const toggleBatch = (batch: Batch) => {
+  if (isBatchOpened(batch.id)) {
+    closeBatch(batch.id);
+  } else {
+    openBatch(batch.id);
+  }
+};
+
+const syncOpenedBatches = () => {
+  const available = new Set(batches.value.map((batch) => batch.id));
+  openedBatchIds.value = openedBatchIds.value.filter((id) => available.has(id));
+  if (reportForm.batch_id && !available.has(reportForm.batch_id)) {
+    reportForm.batch_id = openedBatchIds.value[openedBatchIds.value.length - 1] ?? null;
+  }
+  applyBatchFilter();
+};
 
 const fetchOpportunities = async () => {
   loading.value = true;
@@ -372,11 +495,7 @@ const fetchBatches = async () => {
   try {
     const { data } = await api.getBatches();
     batches.value = data?.data ?? data ?? [];
-    if (!activeBatchId.value && batches.value.length > 0) {
-      activeBatchId.value = batches.value[0].id;
-      reportForm.batch_id = batches.value[0].id;
-      applyBatchFilter();
-    }
+    syncOpenedBatches();
   } catch (err: any) {
     error.value = err?.message ?? '批次列表获取失败';
   } finally {
@@ -384,17 +503,14 @@ const fetchBatches = async () => {
   }
 };
 
-const selectBatch = (batch: Batch) => {
-  activeBatchId.value = batch.id;
-  reportForm.batch_id = batch.id;
-  applyBatchFilter();
-  fetchReports(batch.id);
-};
-
 const fetchReports = async (batchId?: number | null) => {
+  const target = typeof batchId === 'number' ? batchId : reportForm.batch_id;
+  if (!target) {
+    reports.value = [];
+    return;
+  }
   try {
-    const params = batchId ? { batch_id: batchId } : undefined;
-    const { data } = await api.getReports(params as any);
+    const { data } = await api.getReports({ batch_id: target });
     reports.value = data?.data ?? data ?? [];
   } catch (err: any) {
     error.value = err?.message ?? '报告获取失败';
@@ -423,27 +539,33 @@ const submitReport = async () => {
 
 const handleRefreshAll = async () => {
   await Promise.all([fetchBatches(), fetchOpportunities()]);
-  if (activeBatchId.value) {
-    fetchReports(activeBatchId.value);
+  if (reportForm.batch_id) {
+    fetchReports(reportForm.batch_id);
+  } else if (openedBatchIds.value.length) {
+    fetchReports(openedBatchIds.value[openedBatchIds.value.length - 1]);
   }
-};
-
-const applyBatchFilter = () => {
-  if (!activeBatchId.value) {
-    opportunities.value = [];
-    return;
-  }
-  opportunities.value = allOpportunities.value.filter((opp) => opp.batch_id === activeBatchId.value);
 };
 
 onMounted(() => {
   fetchBatches().then(() => {
-    if (activeBatchId.value) {
-      fetchReports(activeBatchId.value);
+    if (reportForm.batch_id) {
+      fetchReports(reportForm.batch_id);
     }
   });
   fetchOpportunities();
 });
+
+watch(
+  () => reportForm.batch_id,
+  (value, prev) => {
+    if (value && value !== prev) {
+      fetchReports(value);
+    }
+    if (!value) {
+      reports.value = [];
+    }
+  },
+);
 </script>
 
 <style scoped>
@@ -505,10 +627,25 @@ onMounted(() => {
 .batch-item {
   cursor: pointer;
   transition: background-color 0.2s;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .batch-item.active {
   background-color: #e6f7ff;
+}
+
+.batch-info {
+  flex: 1;
+}
+
+.batch-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
 }
 
 .batch-name {
@@ -574,5 +711,12 @@ onMounted(() => {
 
 .error-alert {
   margin-bottom: 24px;
+}
+
+.opened-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 </style>

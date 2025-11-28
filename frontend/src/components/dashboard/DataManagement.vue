@@ -65,8 +65,6 @@ interface TemplateConfigs {
 const props = defineProps<Props>();
 const remoteTasks = ref<any[]>([]);
 const templates = ref<any[]>([]);
-const batches = ref<any[]>([]);
-const reports = ref<any[]>([]);
 const reportForm = ref({
   batch_id: '',
   format: 'PDF',
@@ -251,16 +249,12 @@ const updateTaskState = (taskType: PipelineTaskType, payload: Partial<Task>) => 
 const fetchControlData = async () => {
   controlError.value = '';
   try {
-    const [taskRes, templateRes, batchRes, reportRes] = await Promise.all([
+    const [taskRes, templateRes] = await Promise.all([
       api.getTasks({ page: 1, limit: 5 }),
       api.getTemplates(),
-      api.getBatches(),
-      api.getReports(),
     ]);
     remoteTasks.value = taskRes.data?.data?.items ?? [];
     templates.value = templateRes.data?.data ?? templateRes.data ?? [];
-    batches.value = batchRes.data?.data ?? batchRes.data ?? [];
-    reports.value = reportRes.data?.data ?? reportRes.data ?? [];
   } catch (error: any) {
     controlError.value = error?.message ?? '控制中心数据加载失败';
   }
@@ -639,62 +633,49 @@ const runPipelineTask = async (taskType: PipelineTaskType) => {
       </div>
 
       <div
-        class="rounded-md border p-4 space-y-4"
+        class="rounded-md border p-4 space-y-3"
         :class="isDark ? 'bg-[#161b22] border-[#30363d]' : 'bg-white border-[#d0d7de]'"
       >
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <h3 :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">Batch Overview</h3>
-            <button class="text-xs" :class="isDark ? 'text-[#58a6ff]' : 'text-[#0969da]'" @click="fetchControlData">
-              Refresh
-            </button>
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">Quick Report</h3>
+            <p class="text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+              直接在此创建报告任务，详细批次数据请前往 Arbitrage 页查看。
+            </p>
           </div>
-          <ul class="space-y-2">
-            <li
-              v-for="batch in batches.slice(0, 3)"
-              :key="batch.id"
-              class="border rounded px-3 py-2 text-sm"
-              :class="isDark ? 'border-[#30363d]' : 'border-[#d0d7de]'"
-            >
-              <div class="font-medium">{{ batch.name }}</div>
-              <div class="text-xs text-[#7d8590]">Last refreshed: {{ batch.last_refreshed_at ?? '—' }}</div>
-            </li>
-            <li v-if="batches.length === 0" class="text-xs text-[#7d8590]">暂无批次</li>
-          </ul>
-        </div>
-
-        <div class="border-t pt-4 border-[#30363d] space-y-2">
-          <h3 class="text-sm font-medium">Quick Report</h3>
-          <div class="grid grid-cols-1 gap-2 text-xs">
-            <input
-              v-model="reportForm.batch_id"
-              type="number"
-              placeholder="Batch ID"
-              :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]"
-            />
-            <input
-              v-model="reportForm.template_id"
-              type="number"
-              placeholder="Template ID (optional)"
-              :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]"
-            />
-            <select
-              v-model="reportForm.format"
-              :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]"
-            >
-              <option value="PDF">PDF</option>
-              <option value="HTML">HTML</option>
-              <option value="Markdown">Markdown</option>
-            </select>
-          </div>
-          <button
-            type="button"
-            class="w-full px-3 py-1.5 bg-[#238636] text-white text-xs rounded hover:bg-[#2ea043]"
-            @click="submitQuickReport"
-          >
-            Submit Report Task
+          <button class="text-xs" :class="isDark ? 'text-[#58a6ff]' : 'text-[#0969da]'" @click="fetchControlData">
+            Reload
           </button>
         </div>
+        <div class="grid grid-cols-1 gap-2 text-xs">
+          <input
+            v-model="reportForm.batch_id"
+            type="number"
+            placeholder="Batch ID"
+            :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]"
+          />
+          <input
+            v-model="reportForm.template_id"
+            type="number"
+            placeholder="Template ID (optional)"
+            :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]"
+          />
+          <select
+            v-model="reportForm.format"
+            :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]"
+          >
+            <option value="PDF">PDF</option>
+            <option value="HTML">HTML</option>
+            <option value="Markdown">Markdown</option>
+          </select>
+        </div>
+        <button
+          type="button"
+          class="w-full px-3 py-1.5 bg-[#238636] text-white text-xs rounded hover:bg-[#2ea043]"
+          @click="submitQuickReport"
+        >
+          Submit Report Task
+        </button>
       </div>
     </div>
 

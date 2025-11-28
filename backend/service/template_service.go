@@ -2,6 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"backend/models"
@@ -81,7 +85,73 @@ func (s *TemplateService) RunTemplate(ctx context.Context, templateID uint, over
 	for k, v := range overrides {
 		config[k] = v
 	}
+	if template.TaskType == "analyse" {
+		config, err = s.ensureAnalyseConfig(ctx, config)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return s.taskManager.CreateTask(ctx, template.TaskType, taskID, trigger, config)
+}
+
+func (s *TemplateService) ensureAnalyseConfig(ctx context.Context, config datatypes.JSONMap) (datatypes.JSONMap, error) {
+	if config == nil {
+		config = datatypes.JSONMap{}
+	}
+	if shouldAutoCreateBatch(config["batch_id"]) {
+		now := time.Now()
+		batch := &models.Batch{
+			Name:        fmt.Sprintf("Auto Batch %s", now.Format("20060102-150405")),
+			Description: "自动为套利分析任务创建的批次",
+		}
+		if err := s.db.WithContext(ctx).Create(batch).Error; err != nil {
+			return nil, err
+		}
+		config["batch_id"] = batch.ID
+	}
+	return config, nil
+}
+
+func shouldAutoCreateBatch(value interface{}) bool {
+	if value == nil {
+		return true
+	}
+	switch v := value.(type) {
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if trimmed == "" {
+			return true
+		}
+		num, err := strconv.ParseInt(trimmed, 10, 64)
+		if err != nil {
+			return false
+		}
+		return num <= 0
+	case float64:
+		return v <= 0
+	case float32:
+		return v <= 0
+	case int:
+		return v <= 0
+	case int32:
+		return v <= 0
+	case int64:
+		return v <= 0
+	case uint:
+		return v == 0
+	case uint32:
+		return v == 0
+	case uint64:
+		return v == 0
+	case json.Number:
+		num, err := v.Int64()
+		if err != nil {
+			return true
+		}
+		return num <= 0
+	default:
+		return false
+	}
 }
 
 type BatchService struct {

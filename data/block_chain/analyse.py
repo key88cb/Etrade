@@ -110,8 +110,8 @@ def fetch_price_pairs(
                 block_time, 
                 price AS uniswap_price, 
                 gas_price,
-                -- 计算过去 10 分钟的累计成交量 (ETH) 作为市场深度/流动性的代理
-                SUM(amount_eth) OVER (
+                -- 计算过去 10 分钟的绝对累计成交量 (ETH) 作为市场深度/流动性的代理
+                SUM(ABS(amount_eth)) OVER (
                     ORDER BY block_time 
                     RANGE BETWEEN INTERVAL '10 minutes' PRECEDING AND CURRENT ROW
                 ) as window_volume

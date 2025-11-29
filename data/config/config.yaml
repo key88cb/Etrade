@@ -1,9 +1,9 @@
 db:
-  host: localhost
+  host: 121.196.205.18
   port: 5432
   database: test_etrade
   username: postgres
-  password: 123456
+  password: etrade2025
 
 the_graph:
   api_key: 9f9faba5da813868926b3337fb728af5

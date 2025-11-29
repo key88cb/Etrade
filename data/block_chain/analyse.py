@@ -109,7 +109,12 @@ def fetch_price_pairs(
             SELECT 
                 block_time, 
                 price AS uniswap_price, 
-                gas_price
+                gas_price,
+                -- 计算过去 10 分钟的累计成交量 (ETH) 作为市场深度/流动性的代理
+                SUM(amount_eth) OVER (
+                    ORDER BY block_time 
+                    RANGE BETWEEN INTERVAL '10 minutes' PRECEDING AND CURRENT ROW
+                ) as window_volume
             FROM uniswap_swaps u
             {where_clause}
         ),
@@ -135,6 +140,7 @@ def fetch_price_pairs(
             u.block_time,
             u.uniswap_price,
             u.gas_price,
+            u.window_volume,
             b.binance_price
         FROM 
             uniswap_data u
@@ -194,48 +200,73 @@ def calculate_profit_buy_dex_sell_cex(
 
 def analyze_opportunities(price_pairs: list, strategy: dict[str, Any]):
     logger.info("开始在本地内存中分析套利机会...")
+    from .analyze_risk import calculate_risk_metrics_local
+
     profitable_trades = []
     threshold = float(strategy["profit_threshold"])
+    investment = float(strategy["initial_investment"])
 
-    for row in price_pairs:
-        block_time = row[0]
-        uniswap_price = pd.to_numeric(row[1], errors="coerce")
-        gas_price = pd.to_numeric(row[2], errors="coerce")
-        binance_price = pd.to_numeric(row[3], errors="coerce")
+    # 将 price_pairs 转为 DataFrame 以便计算波动率
+    # 注意：现在多了 window_volume 列
+    df = pd.DataFrame(price_pairs, columns=["block_time", "uniswap_price", "gas_price", "window_volume", "binance_price"])
+    # 确保类型正确
+    df["uniswap_price"] = pd.to_numeric(df["uniswap_price"], errors="coerce")
+    df["binance_price"] = pd.to_numeric(df["binance_price"], errors="coerce")
+    df["window_volume"] = pd.to_numeric(df["window_volume"], errors="coerce").fillna(0)
+    
+    # 计算滑动窗口波动率 (Rolling Volatility)
+    # 假设数据是按时间排序的。计算过去 10 个点的标准差作为波动率估计
+    df["volatility"] = df["uniswap_price"].rolling(window=10).std() / df["uniswap_price"].rolling(window=10).mean()
+    df["volatility"] = df["volatility"].fillna(0)
+
+    for index, row in df.iterrows():
+        block_time = row["block_time"]
+        uniswap_price = row["uniswap_price"]
+        gas_price = row["gas_price"]
+        binance_price = row["binance_price"]
+        volatility = row["volatility"]
+        # 使用数据库查出来的真实 volume
+        market_volume = row["window_volume"]
 
         if pd.isna(uniswap_price) or pd.isna(gas_price) or pd.isna(binance_price):
             continue
 
+        opp = None
         if uniswap_price > binance_price and binance_price != 0:
             profit = calculate_profit_buy_cex_sell_dex(
                 strategy, binance_price, uniswap_price, gas_price
             )
             if profit > threshold:
-                profitable_trades.append(
-                    {
-                        "block_time": block_time,
-                        "buy_platform": "Binance",
-                        "sell_platform": "Uniswap",
-                        "buy_price": float(binance_price),
-                        "sell_price": float(uniswap_price),
-                        "profit_usdt": float(profit),
-                    }
-                )
+                opp = {
+                    "block_time": block_time,
+                    "buy_platform": "Binance",
+                    "sell_platform": "Uniswap",
+                    "buy_price": float(binance_price),
+                    "sell_price": float(uniswap_price),
+                    "profit_usdt": float(profit),
+                }
         elif binance_price > uniswap_price and uniswap_price != 0:
             profit = calculate_profit_buy_dex_sell_cex(
                 strategy, uniswap_price, binance_price, gas_price
             )
             if profit > threshold:
-                profitable_trades.append(
-                    {
-                        "block_time": block_time,
-                        "buy_platform": "Uniswap",
-                        "sell_platform": "Binance",
-                        "buy_price": float(uniswap_price),
-                        "sell_price": float(binance_price),
-                        "profit_usdt": float(profit),
-                    }
-                )
+                opp = {
+                    "block_time": block_time,
+                    "buy_platform": "Uniswap",
+                    "sell_platform": "Binance",
+                    "buy_price": float(uniswap_price),
+                    "sell_price": float(binance_price),
+                    "profit_usdt": float(profit),
+                }
+        
+        if opp:
+            # 集成风险分析
+            risk_metrics = calculate_risk_metrics_local(
+                opp, volatility, market_volume, investment
+            )
+            opp["risk_metrics"] = risk_metrics
+            profitable_trades.append(opp)
+
     logger.info("分析结束，本次找到 %s 条机会", len(profitable_trades))
     return profitable_trades
 
@@ -262,7 +293,8 @@ def save_results(
                     buy_price numeric,
                     sell_price numeric,
                     profit_usdt numeric,
-                    details_json jsonb
+                    details_json jsonb,
+                    risk_metrics_json jsonb
                 );
                 """
             )
@@ -295,13 +327,15 @@ def save_results(
                     item["sell_price"],
                     item["profit_usdt"],
                     Json(details),
+                    # 独立存入 risk_metrics_json
+                    Json(item.get("risk_metrics", {}))
                 )
             )
         execute_values(
             cur,
             """
             INSERT INTO arbitrage_opportunities
-            (batch_id, buy_platform, sell_platform, buy_price, sell_price, profit_usdt, details_json)
+            (batch_id, buy_platform, sell_platform, buy_price, sell_price, profit_usdt, details_json, risk_metrics_json)
             VALUES %s
             """,
             records,

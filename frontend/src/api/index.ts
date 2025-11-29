@@ -22,11 +22,15 @@ interface OpportunitiesParams {
   limit?: number;
   sort_by?: string;
   order?: 'asc' | 'desc';
+  startTime?: number;
+  endTime?: number;
+  taskId?: string | number;
 }
 
 interface PriceComparisonParams {
   startTime: number;
   endTime: number;
+  taskId?: string | number;
 }
 
 export interface TaskListParams {
@@ -74,6 +78,9 @@ const api = {
   updateBatch: (id: number, payload: BatchPayload) => instance.put(`/batches/${id}`, payload),
   getReports: (params?: { batch_id?: number }) => instance.get('/reports', { params }),
   createReport: (payload: ReportPayload) => instance.post('/reports', payload),
+  
+  // 🌟 新增：删除报告接口
+  deleteReport: (id: number) => instance.delete(`/reports/${id}`),
 };
 
 export default api;

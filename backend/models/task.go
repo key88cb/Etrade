@@ -63,6 +63,7 @@ type Report struct {
 	GeneratedAt time.Time `json:"generated_at"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+	Status      string    `json:"status"` // 状态: PENDING, GENERATING, SUCCESS, FAILED
 }
 
 // Experiment 一组模板运行视作一次实验，便于对比

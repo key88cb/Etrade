@@ -7,79 +7,23 @@ import yaml
 from loguru import logger
 from psycopg2.extras import Json, execute_values
 
-from .utils import load_config_from_string
+from task import check_task, update_task_status
 
-# 默认策略参数
-DEFAULT_STRATEGY = {
-    "binance_fee_rate": 0.001,
-    "uniswap_fee_rate": 0.0005,
-    "estimated_gas_used": 20,
-    "initial_investment": 100000.0,
-    "time_delay_seconds": 3,
-    "window_seconds": 5,
-    "profit_threshold": 10,
-}
+with open("../config/config.yaml", "r", encoding="utf-8") as file:
+    config = yaml.safe_load(file)
 
-with open("config/config.yaml", "r", encoding="utf-8") as file:
-    _CONFIG = yaml.safe_load(file)
+db_config = config.get("db", {})
 
-DEFAULT_DB_CONFIG = _CONFIG.get("db", {})
-
-
-def _build_db_conn(overrides: dict[str, Any]):
-    cfg = DEFAULT_DB_CONFIG.copy()
-    cfg.update(overrides or {})
-    conn = psycopg2.connect(
-        host=cfg.get("host"),
-        port=cfg.get("port"),
-        dbname=cfg.get("database"),
-        user=cfg.get("username"),
-        password=cfg.get("password"),
-    )
-    conn.autocommit = False
-    return conn
-
-
-def _parse_timestamp(value: Optional[str]) -> Optional[pd.Timestamp]:
+def _parse_timestamp(value: str) -> pd.Timestamp:
     if not value:
         return None
     return pd.to_datetime(value, utc=True, errors="raise")
 
-
-def parse_cli_args(
-    argv: Optional[list[str]] = None,
-) -> Tuple[Optional[pd.Timestamp], Optional[pd.Timestamp]]:
-    """
-    描述：解析命令行参数，返回起止时间戳
-    参数：argv: 自定义参数列表，测试时可注入；默认读取 sys.argv
-    返回值：(start_timestamp, end_timestamp)
-    """
-    parser = argparse.ArgumentParser(
-        description="从数据库中筛选指定时间范围的交易数据并执行套利分析。",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument(
-        "--start", type=str, help="起始时间 (ISO8601，如 2025-09-01T00:00:00Z)"
-    )
-    parser.add_argument(
-        "--end", type=str, help="结束时间 (ISO8601，如 2025-09-07T23:59:59Z)"
-    )
-    args = parser.parse_args(argv)
-
-    start_ts = _parse_timestamp(args.start)
-    end_ts = _parse_timestamp(args.end)
-
-    if start_ts and end_ts and start_ts > end_ts:
-        parser.error("start 时间必须早于 end 时间。")
-
-    return start_ts, end_ts
-
-
 def fetch_price_pairs(
     conn,
     strategy: dict[str, Any],
-    start_time: Optional[pd.Timestamp] = None,
-    end_time: Optional[pd.Timestamp] = None,
+    start_time: pd.Timestamp = None,
+    end_time: pd.Timestamp = None,
 ) -> list[Tuple]:
     """
     使用单个 SQL JOIN 查询，让数据库服务器完成所有繁重的计算.
@@ -146,7 +90,7 @@ def fetch_price_pairs(
     with conn.cursor() as cur:
         cur.execute(sql_query, params)
         price_pairs = cur.fetchall()
-    logger.info("计算完成，从服务器收到 %s 对价格。", len(price_pairs))
+    logger.info(f"计算完成，从服务器收到 {len(price_pairs)} 对价格。")
     return price_pairs
 
 
@@ -236,7 +180,7 @@ def analyze_opportunities(price_pairs: list, strategy: dict[str, Any]):
                         "profit_usdt": float(profit),
                     }
                 )
-    logger.info("分析结束，本次找到 %s 条机会", len(profitable_trades))
+    logger.info(f"分析结束，本次找到 {len(profitable_trades)} 条机会")
     return profitable_trades
 
 
@@ -244,12 +188,11 @@ def save_results(
     conn,
     results: list[dict[str, Any]],
     batch_id: int,
-    append: bool,
-    rebuild_table: bool = False,
+    overwrite: bool = False,
     experiment_id: Optional[int] = None,
 ) -> None:
     with conn.cursor() as cur:
-        if rebuild_table:
+        if overwrite:
             logger.info("正在重建 arbitrage_opportunities 表...")
             cur.execute("DROP TABLE IF EXISTS arbitrage_opportunities;")
             cur.execute(
@@ -266,18 +209,16 @@ def save_results(
                 );
                 """
             )
-        elif not append:
-            logger.info("清理批次 %s 旧数据", batch_id)
-            cur.execute(
-                "DELETE FROM arbitrage_opportunities WHERE batch_id = %s", (batch_id,)
-            )
+        else:
+            # overwrite=False 时追加数据，不删除旧数据
+            pass
 
         if not results:
             conn.commit()
             logger.info("没有结果需要写入。")
             return
 
-        logger.info("正在写入 %s 条套利机会...", len(results))
+        logger.info(f"正在写入 {len(results)} 条套利机会...")
         records = []
         for item in results:
             details = {
@@ -315,8 +256,7 @@ def ensure_batch_exists(conn, batch_id: int) -> None:
         return
     with conn.cursor() as cur:
         cur.execute("SELECT 1 FROM batches WHERE id = %s", (batch_id,))
-        exists = cur.fetchone()
-        if exists:
+        if cur.fetchone():
             return
         name = f"Auto Batch {batch_id}"
         description = "批次由套利分析脚本自动创建"
@@ -333,44 +273,45 @@ def ensure_batch_exists(conn, batch_id: int) -> None:
 
 def run_analyse(task_id: Optional[str] = None, config_json: Optional[str] = None):
     config = load_config_from_string(config_json)
+    # 默认策略 + 自定义参数
     strategy = DEFAULT_STRATEGY.copy()
     strategy.update(config.get("strategy", {}))
     batch_id = int(config.get("batch_id", 1))
-    append = bool(config.get("append", False))
-    rebuild_table = bool(config.get("rebuild_table", False))
+    overwrite = bool(config.get("overwrite", False))
     experiment_id = config.get("experiment_id")
 
     start_ts = _parse_timestamp(config.get("start"))
     end_ts = _parse_timestamp(config.get("end"))
     if start_ts and end_ts and start_ts > end_ts:
-        raise ValueError("start 必须早于 end")
+        update_task_status(task_id, 2)
+        return
 
     logger.info("套利分析任务启动")
-    conn = _build_db_conn(config.get("db", {}))
+    conn = psycopg2.connect(
+        host=db_config["host"],
+        port=db_config["port"],
+        dbname=db_config["database"],
+        user=db_config["username"],
+        password=db_config["password"],
+    )
+    conn.autocommit = False
     try:
         ensure_batch_exists(conn, batch_id)
         price_pairs = fetch_price_pairs(conn, strategy, start_ts, end_ts)
         opportunities = analyze_opportunities(price_pairs, strategy)
-        save_results(
-            conn, opportunities, batch_id, append, rebuild_table, experiment_id
-        )
+        save_results(conn, opportunities, batch_id, overwrite, experiment_id)
     except Exception as exc:
         conn.rollback()
         logger.error(f"分析失败: {exc}")
         conn.close()
+        update_task_status(task_id, 2)
         raise
     else:
         logger.info(f"分析完成，发现 {len(opportunities)} 条机会")
+        update_task_status(task_id, 1)
         conn.close()
 
 
-def main():
-    parser = argparse.ArgumentParser(description="套利分析任务")
-    parser.add_argument("--task-id", dest="task_id", default=None)
-    parser.add_argument("--config", dest="config", default=None, help="JSON 配置")
-    args = parser.parse_args()
-    run_analyse(args.task_id, args.config)
-
-
 if __name__ == "__main__":
-    main()
+    run_analyse(task_id="1", binance_fee_rate=0.001, uniswap_fee_rate=0.0005, 
+        estimated_gas_used=20, initial_investment=100000.0, time_delay_seconds=3, window_seconds=5, profit_threshold=10)

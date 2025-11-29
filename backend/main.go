@@ -5,6 +5,7 @@ import (
 	"backend/config"
 	"backend/db"
 	"backend/grpcserver"
+	"backend/pkg/taskpb"
 	"backend/service"
 	"log"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/spf13/viper"
 	swaggerFiles "github.com/swaggo/files"     // 导入 swaggerFiles
 	ginSwagger "github.com/swaggo/gin-swagger" // 导入 ginSwagger
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -26,7 +28,19 @@ func main() {
 		log.Printf("Failed to initialize database: %v", err)
 	}
 	taskManager := service.NewTaskManager(db.GetDB())
-	templateService := service.NewTemplateService(db.GetDB(), taskManager)
+	var dispatcher service.TaskDispatcher
+	workerAddr := viper.GetString("worker.address")
+	if workerAddr != "" {
+		conn, err := grpc.Dial(workerAddr, grpc.WithInsecure())
+		if err != nil {
+			log.Printf("Failed to connect worker gRPC at %s: %v", workerAddr, err)
+		} else {
+			dispatcher = service.NewGRPCTaskDispatcher(taskpb.NewTaskServiceClient(conn))
+			log.Printf("Connected worker gRPC at %s", workerAddr)
+		}
+	}
+
+	templateService := service.NewTemplateService(db.GetDB(), taskManager, dispatcher)
 	batchService := service.NewBatchService(db.GetDB())
 	reportService := service.NewReportService(db.GetDB())
 

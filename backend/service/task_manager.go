@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"backend/models"
@@ -43,8 +44,10 @@ func (m *TaskManager) CreateTask(ctx context.Context, taskType, taskID, trigger 
 		QueuedAt:   ptrTime(time.Now()),
 	}
 	if err := m.db.WithContext(ctx).Create(task).Error; err != nil {
+		log.Printf("[TaskManager] create task failed type=%s id=%s error=%v", taskType, taskID, err)
 		return nil, err
 	}
+	log.Printf("[TaskManager] queued task type=%s id=%s trigger=%s", taskType, taskID, trigger)
 	return task, nil
 }
 

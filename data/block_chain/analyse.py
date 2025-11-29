@@ -246,33 +246,46 @@ def save_results(
             VALUES %s
             """,
             records,
-        )
+    )
     conn.commit()
     logger.info("写入完成并已提交。")
 
 
-def run_analyse(
-    task_id: str,
-    **kwargs
-):
-    strategy_params = {
-        "binance_fee_rate": kwargs.get("binance_fee_rate", 0.001),
-        "uniswap_fee_rate": kwargs.get("uniswap_fee_rate", 0.0005),
-        "estimated_gas_used": kwargs.get("estimated_gas_used", 20),
-        "initial_investment": kwargs.get("initial_investment", 100000.0),
-        "time_delay_seconds": kwargs.get("time_delay_seconds", 3),
-        "window_seconds": kwargs.get("window_seconds", 5),
-        "profit_threshold": kwargs.get("profit_threshold", 10),
-    }
-    batch_id = kwargs.get("batch_id", 1)
-    overwrite = kwargs.get("overwrite", False)
-    experiment_id = kwargs.get("experiment_id")
+def ensure_batch_exists(conn, batch_id: int) -> None:
+    if not batch_id:
+        return
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM batches WHERE id = %s", (batch_id,))
+        if cur.fetchone():
+            return
+        name = f"Auto Batch {batch_id}"
+        description = "批次由套利分析脚本自动创建"
+        logger.info("批次 %s 不存在，自动创建", batch_id)
+        cur.execute(
+            """
+            INSERT INTO batches (id, name, description, last_refreshed_at, created_at, updated_at)
+            VALUES (%s, %s, %s, NOW(), NOW(), NOW())
+            """,
+            (batch_id, name, description),
+        )
+    conn.commit()
 
-    start_ts = _parse_timestamp(kwargs.get("start"))
-    end_ts = _parse_timestamp(kwargs.get("end"))
+
+def run_analyse(task_id: Optional[str] = None, config_json: Optional[str] = None):
+    config = load_config_from_string(config_json)
+    # 默认策略 + 自定义参数
+    strategy = DEFAULT_STRATEGY.copy()
+    strategy.update(config.get("strategy", {}))
+    batch_id = int(config.get("batch_id", 1))
+    overwrite = bool(config.get("overwrite", False))
+    experiment_id = config.get("experiment_id")
+
+    start_ts = _parse_timestamp(config.get("start"))
+    end_ts = _parse_timestamp(config.get("end"))
     if start_ts and end_ts and start_ts > end_ts:
         update_task_status(task_id, 2)
         return
+
     logger.info("套利分析任务启动")
     conn = psycopg2.connect(
         host=db_config["host"],
@@ -283,11 +296,10 @@ def run_analyse(
     )
     conn.autocommit = False
     try:
-        price_pairs = fetch_price_pairs(conn, strategy_params, start_ts, end_ts)
-        opportunities = analyze_opportunities(price_pairs, strategy_params)
-        save_results(
-            conn, opportunities, batch_id, overwrite, experiment_id
-        )
+        ensure_batch_exists(conn, batch_id)
+        price_pairs = fetch_price_pairs(conn, strategy, start_ts, end_ts)
+        opportunities = analyze_opportunities(price_pairs, strategy)
+        save_results(conn, opportunities, batch_id, overwrite, experiment_id)
     except Exception as exc:
         conn.rollback()
         logger.error(f"分析失败: {exc}")
@@ -298,6 +310,7 @@ def run_analyse(
         logger.info(f"分析完成，发现 {len(opportunities)} 条机会")
         update_task_status(task_id, 1)
         conn.close()
+
 
 if __name__ == "__main__":
     run_analyse(task_id="1", binance_fee_rate=0.001, uniswap_fee_rate=0.0005, 

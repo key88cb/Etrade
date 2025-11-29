@@ -18,6 +18,13 @@ interface Props {
   theme: Theme;
 }
 
+interface RiskMetrics {
+  risk_score: number;
+  volatility: number;
+  estimated_slippage_pct: number;
+  market_volume_eth: number;
+}
+
 interface ApiOpportunity {
   id: number;
   batch_id?: number;
@@ -26,6 +33,7 @@ interface ApiOpportunity {
   buy_price: number;
   sell_price: number;
   profit_usdt: number;
+  risk_metrics?: RiskMetrics;
 }
 
 interface Batch {
@@ -52,6 +60,12 @@ const batchError = ref('');
 const openedBatchIds = ref<number[]>([]);
 
 const isDark = computed(() => props.theme === 'dark');
+
+const getRiskColor = (score: number) => {
+  if (score >= 80) return 'text-[#3fb950]'; // Green
+  if (score >= 60) return 'text-[#d29922]'; // Orange
+  return 'text-[#f85149]'; // Red
+};
 
 const filteredOpportunities = computed(() => {
   if (!openedBatchIds.value.length) return [];
@@ -423,6 +437,9 @@ watch(
               <th class="px-4 py-3 text-right text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
                 Sell Price
               </th>
+              <th class="px-4 py-3 text-center text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+                Risk Score
+              </th>
               <th
                 class="px-4 py-3 text-right text-xs cursor-pointer"
                 :class="isDark ? 'text-[#7d8590] hover:text-[#58a6ff]' : 'text-[#57606a] hover:text-[#0969da]'"
@@ -445,12 +462,12 @@ watch(
           </thead>
           <tbody>
             <tr v-if="!openedBatchIds.length">
-              <td colspan="6" class="px-4 py-6 text-center text-sm" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+              <td colspan="7" class="px-4 py-6 text-center text-sm" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
                 请选择左侧批次以查看套利数据。
               </td>
             </tr>
             <tr v-else-if="isLoading">
-              <td colspan="6" class="px-4 py-6 text-center">
+              <td colspan="7" class="px-4 py-6 text-center">
                 <Loader2 class="w-4 h-4 inline-block animate-spin mr-2 text-[#58a6ff]" />
                 <span :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">加载中...</span>
               </td>
@@ -459,7 +476,7 @@ watch(
               v-else-if="!filteredTotal"
               :class="['border-b', isDark ? 'border-[#21262d]' : 'border-[#d0d7de]']"
             >
-              <td colspan="6" class="px-4 py-6 text-center text-sm" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+              <td colspan="7" class="px-4 py-6 text-center text-sm" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
                 所选批次暂未生成套利机会。
               </td>
             </tr>
@@ -486,6 +503,17 @@ watch(
               </td>
               <td class="px-4 py-3 text-sm text-right" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">
                 {{ formatCurrency(opportunity.sell_price ?? 0) }}
+              </td>
+              <td class="px-4 py-3 text-sm text-center">
+                <div v-if="opportunity.risk_metrics">
+                  <span class="font-bold" :class="getRiskColor(opportunity.risk_metrics.risk_score)">
+                    {{ opportunity.risk_metrics.risk_score }}
+                  </span>
+                  <div class="text-[10px]" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+                    Slippage: {{ opportunity.risk_metrics.estimated_slippage_pct.toFixed(2) }}%
+                  </div>
+                </div>
+                <span v-else class="text-gray-500">-</span>
               </td>
               <td class="px-4 py-3 text-sm text-right text-[#3fb950]">
                 {{ formatCurrency(opportunity.profit_usdt ?? 0) }}

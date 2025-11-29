@@ -69,7 +69,8 @@ db:
 ### B. 分析结果层 (Analytical Results)
 
 #### 3. `arbitrage_opportunities` (套利机会)
-*   **来源**: `analyse.py` (核心算法生成)。
+*   **来源**: `analyse.py` (核心算法生成，集成了 `analyze_risk.py` 的风险评估)。
+*   **更新**: 新增了 `risk_metrics_json` 字段用于存储风险分析结果。
 
 | 字段名 | 数据类型 | 描述 |
 | :--- | :--- | :--- |
@@ -81,6 +82,7 @@ db:
 | `sell_price` | `NUMERIC` | 卖出价格 |
 | `profit_usdt` | `NUMERIC` | **净利润** (已扣除双边手续费 + 链上 Gas 费) |
 | `details_json` | `JSONB` | 元数据（如 `experiment_id`，具体的 `block_time` 等） |
+| **`risk_metrics_json`** | **`JSONB`** | **新增**: 风险指标 (包含 `risk_score`, `volatility`, `estimated_slippage_pct` 等) |
 
 #### 4. `aggregated_prices` (聚合行情)
 *   **来源**: `process_prices.py`。
@@ -187,11 +189,35 @@ Python 脚本遍历 SQL 返回的对齐数据 $(P_{dex}, P_{cex}, P_{gas})$，�
     $$ \Pi = [R_{gross} \times (1 - F_{cex})] - (I + Cost_{gas}) $$
     *(注：此处我们将 Gas 费视为必须预先支付的沉没成本，计入总投入)*
 
-只有当计算出的 $\Pi > \text{Threshold}$ (默认 10 USDT) 时，该机会才会被写入数据库。
+只有当计算出的 $\Pi > \text{Threshold}$ (默认 10 USDT) 时，该机会才会被初步选中，进入风险分析流程。
 
 ---
 
-## 5. 常见问题 (FAQ)
+## 5. 风险分析集成 (`analyze_risk.py`)
+
+在套利机会被发现后，系统会立即在本地调用 `analyze_risk.py` 进行风险评估。这是一次原子操作，结果与套利机会同步写入数据库。
+
+### 5.1 风险模型
+*   **波动率 (Volatility)**: 
+    *   计算方式：对 Uniswap 价格使用 Pandas 滚动窗口 (`window=10`) 计算标准差与均值的比值。
+    *   公式: $\text{Volatility} = \frac{\sigma_{10}}{\mu_{10}}$
+*   **滑点估算 (Estimated Slippage)**: 
+    *   基于“市场冲击平方根法则”简化模型。
+    *   公式: $\text{Slippage} = K \times \sigma \times \sqrt{\frac{\text{TradeSize}}{\text{MarketVolume}}}$
+    *   其中 $K$ 为冲击常数 (默认 2.0)，$\text{MarketVolume}$ 为过去10分钟的累计成交量。
+*   **风险评分 (Risk Score)**: 
+    *   基于扣除预估滑点成本后的“风险调整后利润”计算。
+    *   公式: $\text{Score} = \max(0, \min(100, \frac{\text{Profit} - \text{SlippageCost}}{\text{Profit}} \times 100))$
+
+### 5.2 集成方式
+1.  **数据准备**: `analyse.py` 将 SQL 查询结果转换为 Pandas DataFrame，并在内存中预计算好 `window_volume` (市场深度代理) 和 `volatility`。
+2.  **逐行评估**: 遍历每一个潜在套利机会时，调用 `calculate_risk_metrics_local` 函数。
+3.  **结果合并**: 将计算出的 `risk_metrics` 字典合并到机会对象中。
+4.  **原子写入**: 在 `save_results` 阶段，将 `risk_metrics` 存入数据库 `arbitrage_opportunities` 表的 **`risk_metrics_json`** 列（JSONB 类型）。
+
+---
+
+## 6. 常见问题 (FAQ)
 
 **Q1: 为什么 Uniswap 的时间精度是秒级？**
 A: Uniswap V3 的交易是打包在以太坊区块中的。数据源（The Graph）返回的 `timestamp` 是该交易所在区块的出块时间（Block Timestamp）。目前以太坊出块稳定在 12秒左右，但时间戳通常精确到秒。

@@ -25,6 +25,7 @@ Etrade 是一个用于CEX-DEX套利分析的一站式平台，主要针对Uniswa
 npm install # 下载对应依赖
 npm run dev # 运行项目
 ```
+并配置好 config/config.yaml下的数据库连接信息
 
 前端项目结构，主要是src目录：
 
@@ -77,6 +78,8 @@ go mod tidy # 自动处理依赖关系
 go run main.go # 运行项目，端口8888
 ```
 
+并配置好 config/config.yaml下的数据库连接信息
+
 项目结构，MVC模式：
 - api：用于收发http请求
 - db：数据库配置
@@ -109,6 +112,18 @@ type BinanceTrade struct {
 	Price     float64   `gorm:"not null"`
 	Quantity  float64   `gorm:"not null"`
 }
+```
+
+> 风险分析更新 (Risk Analysis Update)
+> 我们在 `arbitrage_opportunities` 表中新增了 **`risk_metrics_json`** (JSONB) 字段。
+> 现在每次运行 `analyse` 任务时，除了计算利润，还会自动调用 Python 端的风险模型，计算包括**滑点 (Slippage)**、**波动率 (Volatility)** 和 **风险评分 (Risk Score)** 等指标，并存入该字段。
+
+### data分析引擎
+
+```bash
+cd data
+pip install -r requirements.txt
+python server.py
 ```
 
 ## 系统部署指南
@@ -174,6 +189,7 @@ go run main.go
 
 ```bash
 cd frontend
+npm install
 npm run dev        # 开发模式
 # 或 npm run build && npm run preview
 ```

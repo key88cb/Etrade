@@ -7,9 +7,20 @@ import yaml
 from loguru import logger
 from psycopg2.extras import Json, execute_values
 
-from task import check_task, update_task_status
+from .task import check_task, update_task_status
+from .utils import load_config_from_string
 
-with open("../config/config.yaml", "r", encoding="utf-8") as file:
+DEFAULT_STRATEGY = {
+    "binance_fee_rate": 0.001,
+    "uniswap_fee_rate": 0.0005,
+    "estimated_gas_used": 20,
+    "initial_investment": 1000.0,
+    "time_delay_seconds": 3,
+    "window_seconds": 5,
+    "profit_threshold": 1,
+}
+
+with open("./config/config.yaml", "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)
 
 db_config = config.get("db", {})
@@ -347,5 +358,4 @@ def run_analyse(task_id: Optional[str] = None, config_json: Optional[str] = None
 
 
 if __name__ == "__main__":
-    run_analyse(task_id="1", binance_fee_rate=0.001, uniswap_fee_rate=0.0005, 
-        estimated_gas_used=20, initial_investment=100000.0, time_delay_seconds=3, window_seconds=5, profit_threshold=10)
+    pass

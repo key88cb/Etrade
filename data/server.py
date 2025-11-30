@@ -348,7 +348,7 @@ class TaskService(TaskServiceServicer):
                 
                 analyse.run_analyse(
                     task_id=task_id,
-                    **kwargs
+                    config_json=json.dumps(kwargs)
                 )
                 logger.info(f"任务 {task_id} 执行成功: 分析数据")
             except Exception as e:

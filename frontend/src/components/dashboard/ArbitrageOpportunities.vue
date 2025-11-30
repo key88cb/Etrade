@@ -40,7 +40,7 @@ interface ApiOpportunity {
   buy_price: number;
   sell_price: number;
   profit_usdt: number;
-  risk_metrics?: RiskMetrics;
+  risk_metrics: RiskMetrics;
   created_at?: string;
   timestamp?: string | number;
   details?: {
@@ -648,7 +648,7 @@ watch(() => totalPages.value, (pages) => { if (currentPage.value > pages) curren
                 {{ formatCurrency(opportunity.sell_price ?? 0) }}
               </td>
               <td class="px-4 py-3 text-sm text-center">
-                <div v-if="opportunity.risk_metrics">
+                <div>
                   <span class="font-bold" :class="getRiskColor(opportunity.risk_metrics.risk_score)">
                     {{ opportunity.risk_metrics.risk_score }}
                   </span>
@@ -656,7 +656,6 @@ watch(() => totalPages.value, (pages) => { if (currentPage.value > pages) curren
                     Slippage: {{ opportunity.risk_metrics.estimated_slippage_pct.toFixed(2) }}%
                   </div>
                 </div>
-                <span v-else class="text-gray-500">-</span>
               </td>
               <td class="px-4 py-3 text-sm text-right text-[#3fb950]">
                 {{ formatCurrency(opportunity.profit_usdt ?? 0) }}

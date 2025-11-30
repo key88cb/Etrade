@@ -9,7 +9,7 @@ import yaml
 from loguru import logger
 from psycopg2.extras import execute_values
 
-from task import check_task, update_task_status
+from .task import check_task, update_task_status
 
 with open("./config/config.yaml", "r", encoding="utf-8") as file:
     config = yaml.safe_load(file)

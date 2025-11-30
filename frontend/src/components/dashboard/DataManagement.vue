@@ -582,9 +582,30 @@ onMounted(fetchAllData);
                   <label :class="[labelTextClass, 'flex items-center gap-2']"><input type="checkbox" v-model="templateConfigs.process_prices.overwrite" />覆盖旧数据</label>
                 </template>
                 <template v-else>
-                  <label :class="[labelTextClass, 'flex flex-col gap-1']"><span>Batch ID</span><input type="text" v-model="templateConfigs.analyse.batch_id" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" /></label>
+                  <label :class="[labelTextClass, 'flex flex-col gap-1']"><span>Batch ID（可选）</span><input type="text" inputmode="numeric" placeholder="留空自动创建批次" v-model="templateConfigs.analyse.batch_id" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" /></label>
                   <label :class="[labelTextClass, 'flex items-center gap-2']"><input type="checkbox" v-model="templateConfigs.analyse.overwrite" />覆盖批次</label>
-                  <label :class="[labelTextClass, 'flex flex-col gap-1']"><span>Profit Threshold</span><input type="number" v-model.number="templateConfigs.analyse.strategy.profit_threshold" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" /></label>
+                  <label :class="[labelTextClass, 'flex flex-col gap-1']">
+                    <span>分析开始时间</span>
+                    <input type="datetime-local" step="1" v-model="templateConfigs.analyse.window_start" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />
+                  </label>
+                  <label :class="[labelTextClass, 'flex flex-col gap-1']">
+                    <span>分析结束时间</span>
+                    <input type="datetime-local" step="1" v-model="templateConfigs.analyse.window_end" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />
+                  </label>
+                  <div class="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3 border-t pt-2 mt-2" :class="isDark ? 'border-[#30363d]' : 'border-[#d0d7de]'">
+                    <label :class="[labelTextClass, 'flex flex-col gap-1']">
+                      <span>Profit Threshold (USDT)</span>
+                      <input type="number" v-model.number="templateConfigs.analyse.strategy.profit_threshold" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />
+                    </label>
+                    <label :class="[labelTextClass, 'flex flex-col gap-1']">
+                      <span>Time Delay (s)</span>
+                      <input type="number" v-model.number="templateConfigs.analyse.strategy.time_delay_seconds" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />
+                    </label>
+                    <label :class="[labelTextClass, 'flex flex-col gap-1']">
+                      <span>Initial Investment (USDT)</span>
+                      <input type="number" v-model.number="templateConfigs.analyse.strategy.initial_investment" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />
+                    </label>
+                  </div>
                 </template>
              </div>
           </div>

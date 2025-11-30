@@ -325,8 +325,8 @@ def run_analyse(task_id: Optional[str] = None, config_json: Optional[str] = None
     overwrite = bool(config.get("overwrite", False))
     experiment_id = config.get("experiment_id")
 
-    start_ts = _parse_timestamp(config.get("start"))
-    end_ts = _parse_timestamp(config.get("end"))
+    start_ts = _parse_timestamp(strategy.get("start"))
+    end_ts = _parse_timestamp(strategy.get("end"))
     if start_ts and end_ts and start_ts > end_ts:
         update_task_status(task_id, 2)
         return

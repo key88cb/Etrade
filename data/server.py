@@ -341,7 +341,7 @@ class TaskService(TaskServiceServicer):
                 # 准备参数：先合并所有策略参数，然后添加控制参数
                 kwargs = {}
                 # 合并策略参数（所有策略参数都可以传入）
-                kwargs.update(strategy_params)
+                kwargs["strategy"] = strategy_params
                 # 添加控制参数
                 kwargs["batch_id"] = batch_id
                 kwargs["overwrite"] = overwrite  # overwrite=True 时重建表，overwrite=False 时追加数据

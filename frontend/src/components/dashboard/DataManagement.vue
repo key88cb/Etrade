@@ -80,12 +80,12 @@ interface TemplateConfigs {
   analyse: {
     batch_id: string;
     overwrite: boolean;
-    window_start: string;
-    window_end: string;
     strategy: {
       profit_threshold: number;
       time_delay_seconds: number;
       initial_investment: number;
+      start: string;
+      end: string;
     };
   };
 }
@@ -121,7 +121,7 @@ const templateConfigs = reactive<TemplateConfigs>({
   collect_binance: { csv_path: '/data/binance_aggTrades_ETHUSDT.csv', import_percentage: 100, chunk_size: 1000000 },
   collect_uniswap: { pool_address: '0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640', start_date: '', end_date: '' },
   process_prices: { start_date: '', end_date: '', aggregation_interval: '5m', overwrite: true },
-  analyse: { batch_id: '', overwrite: false, window_start: '', window_end: '', strategy: { profit_threshold: 0.5, time_delay_seconds: 15, initial_investment: 100000 } },
+  analyse: { batch_id: '', overwrite: false, strategy: { profit_threshold: 0.5, time_delay_seconds: 15, initial_investment: 10000, start: '', end: '' } },
 });
 
 const tasks = ref<Task[]>([
@@ -259,16 +259,16 @@ const buildOverrides = (taskType: PipelineTaskType): Record<string, unknown> => 
       return overrides;
     }
     case 'analyse': {
-      const { batch_id, overwrite, window_start, window_end, strategy } = templateConfigs.analyse;
+      const { batch_id, overwrite, strategy} = templateConfigs.analyse;
       const overrides: Record<string, unknown> = { overwrite, strategy: { ...strategy } };
       if (batch_id !== '') {
         const parsed = Number(batch_id);
         if (!Number.isNaN(parsed) && parsed > 0) overrides.batch_id = parsed;
       }
-      const startISO = toISODateTime(window_start);
-      if (startISO) overrides.start = startISO;
-      const endISO = toISODateTime(window_end);
-      if (endISO) overrides.end = endISO;
+      const startISO = toISODateTime(strategy.start);
+      if (startISO) overrides.strategy = { ...strategy, start: startISO };
+      const endISO = toISODateTime(strategy.end);
+      if (endISO) overrides.strategy = { ...strategy, end: endISO };
       return overrides;
     }
     default: return {};
@@ -586,11 +586,11 @@ onMounted(fetchAllData);
                   <label :class="[labelTextClass, 'flex items-center gap-2']"><input type="checkbox" v-model="templateConfigs.analyse.overwrite" />覆盖批次</label>
                   <label :class="[labelTextClass, 'flex flex-col gap-1']">
                     <span>分析开始时间</span>
-                    <input type="datetime-local" step="1" v-model="templateConfigs.analyse.window_start" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />
+                    <input type="datetime-local" step="1" v-model="templateConfigs.analyse.strategy.start" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />
                   </label>
                   <label :class="[labelTextClass, 'flex flex-col gap-1']">
                     <span>分析结束时间</span>
-                    <input type="datetime-local" step="1" v-model="templateConfigs.analyse.window_end" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />
+                    <input type="datetime-local" step="1" v-model="templateConfigs.analyse.strategy.end" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />
                   </label>
                   <div class="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3 border-t pt-2 mt-2" :class="isDark ? 'border-[#30363d]' : 'border-[#d0d7de]'">
                     <label :class="[labelTextClass, 'flex flex-col gap-1']">

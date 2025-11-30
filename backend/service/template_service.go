@@ -219,37 +219,3 @@ func (s *BatchService) GetBatch(ctx context.Context, id uint) (*models.Batch, er
 	}
 	return &batch, nil
 }
-
-type ReportService struct {
-	db *gorm.DB
-}
-
-func NewReportService(db *gorm.DB) *ReportService {
-	return &ReportService{db: db}
-}
-
-func (s *ReportService) CreateReport(ctx context.Context, batchID, templateID uint, format, filePath string) (*models.Report, error) {
-	report := &models.Report{
-		BatchID:     batchID,
-		TemplateID:  templateID,
-		Format:      format,
-		FilePath:    filePath,
-		GeneratedAt: time.Now(),
-	}
-	if err := s.db.WithContext(ctx).Create(report).Error; err != nil {
-		return nil, err
-	}
-	return report, nil
-}
-
-func (s *ReportService) ListReports(ctx context.Context, batchID uint) ([]models.Report, error) {
-	query := s.db.WithContext(ctx).Model(&models.Report{}).Order("generated_at DESC")
-	if batchID != 0 {
-		query = query.Where("batch_id = ?", batchID)
-	}
-	var reports []models.Report
-	if err := query.Find(&reports).Error; err != nil {
-		return nil, err
-	}
-	return reports, nil
-}

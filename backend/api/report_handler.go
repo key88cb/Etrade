@@ -1,7 +1,9 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"path/filepath"
 	"strconv"
 
 	"backend/service"
@@ -22,22 +24,22 @@ func NewReportHandler(s *service.ReportService) *ReportHandler {
 func (h *ReportHandler) Register(rg *gin.RouterGroup) {
 	rg.GET("/reports", h.ListReports)
 	rg.POST("/reports", h.CreateReport)
+
+	// 下载接口
+	rg.GET("/reports/:id/download", h.DownloadReport)
+
+	// 如果您还需要删除功能
+	rg.DELETE("/reports/:id", h.DeleteReport)
 }
 
 type reportRequest struct {
 	BatchID    uint   `json:"batch_id" binding:"required"`
 	TemplateID uint   `json:"template_id"`
 	Format     string `json:"format" binding:"required"`
-	FilePath   string `json:"file_path"`
+	// FilePath 不需要前端传
 }
 
 // ListReports 报告列表
-// @Summary 报告列表
-// @Tags    Report
-// @Produce json
-// @Param   batch_id query int false "批次 ID"
-// @Success 200 {array} models.Report
-// @Router  /reports [get]
 func (h *ReportHandler) ListReports(c *gin.Context) {
 	batchIDStr := c.Query("batch_id")
 	var batchID uint
@@ -57,24 +59,75 @@ func (h *ReportHandler) ListReports(c *gin.Context) {
 	utils.Success(c, reports)
 }
 
-// CreateReport 创建报告记录
-// @Summary 记录报告生成结果
-// @Tags    Report
-// @Accept  json
-// @Produce json
-// @Param   report body reportRequest true "报告参数"
-// @Success 200 {object} models.Report
-// @Router  /reports [post]
+// CreateReport 创建并生成报告
 func (h *ReportHandler) CreateReport(c *gin.Context) {
 	var req reportRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.Fail(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	report, err := h.service.CreateReport(c.Request.Context(), req.BatchID, req.TemplateID, req.Format, req.FilePath)
+
+	// 1. 数据库占位 (Status: PENDING)
+	report, err := h.service.CreateReport(c.Request.Context(), req.BatchID, req.TemplateID, req.Format, "")
 	if err != nil {
 		utils.Fail(c, http.StatusInternalServerError, err.Error())
 		return
 	}
+
+	// 启动异步协程生成文件
+	// 如果没有这一段，状态永远是 Pending
+	go func() {
+		fmt.Printf("🚀 Starting generation for Report #%d...\n", report.ID)
+		err := h.service.GenerateReportFile(report.ID, req.BatchID, req.Format)
+		if err != nil {
+			fmt.Printf("❌ Failed to generate report %d: %v\n", report.ID, err)
+		} else {
+			fmt.Printf("✅ Generation complete for Report #%d\n", report.ID)
+		}
+	}()
+
 	utils.Success(c, report)
+}
+
+// DownloadReport 下载报告
+func (h *ReportHandler) DownloadReport(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		utils.Fail(c, http.StatusBadRequest, "invalid report id")
+		return
+	}
+
+	// 1. 获取报告详情
+	report, err := h.service.GetReport(c.Request.Context(), uint(id))
+	if err != nil {
+		utils.Fail(c, http.StatusNotFound, "report not found")
+		return
+	}
+
+	if report.Status != "SUCCESS" {
+		utils.Fail(c, http.StatusBadRequest, "report is not ready")
+		return
+	}
+
+	// 2. 返回文件
+	fileName := filepath.Base(report.FilePath)
+	c.Header("Content-Disposition", "attachment; filename="+fileName)
+	c.Header("Content-Type", "application/octet-stream")
+	c.File(report.FilePath)
+}
+
+// DeleteReport 删除报告
+func (h *ReportHandler) DeleteReport(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		utils.Fail(c, http.StatusBadRequest, "invalid report id")
+		return
+	}
+	if err := h.service.DeleteReport(c.Request.Context(), uint(id)); err != nil {
+		utils.Fail(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, nil)
 }

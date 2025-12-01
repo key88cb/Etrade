@@ -44,6 +44,7 @@ UNION ALL
 );
 """
 
+
 def _daterange(start: datetime.datetime, end: datetime.datetime):
     cursor = start
     while cursor <= end:
@@ -66,7 +67,9 @@ def _write_aggregated_prices(conn, df: pd.DataFrame, overwrite: bool):
         if overwrite:
             logger.info("正在重建 aggregated_prices 表...")
             cur.execute("DROP TABLE IF EXISTS aggregated_prices")
-            cur.execute("CREATE TABLE IF NOT EXISTS aggregated_prices (time_bucket timestamptz, source text, average_price numeric)")
+            cur.execute(
+                "CREATE TABLE IF NOT EXISTS aggregated_prices (time_bucket timestamptz, source text, average_price numeric)"
+            )
         records = df[["time_bucket", "source", "average_price"]].values.tolist()
         execute_values(
             cur,
@@ -78,20 +81,19 @@ def _write_aggregated_prices(conn, df: pd.DataFrame, overwrite: bool):
     logger.info(f"聚合结果写入完成，写入 {len(records)} 条记录")
 
 
-def run_process_prices(
-    task_id: str, **kwargs: Any
-):
+def run_process_prices(task_id: str, **kwargs: Any):
     aggregation_interval = kwargs.get("aggregation_interval", "minute")
     overwrite = bool(kwargs.get("overwrite", True))
-    start_dt = _parse_date(kwargs.get("start_date"), datetime.datetime(2025, 9, 1, tzinfo=datetime.timezone.utc))
+    start_dt = _parse_date(
+        kwargs.get("start_date"),
+        datetime.datetime(2025, 9, 1, tzinfo=datetime.timezone.utc),
+    )
     end_dt = _parse_date(kwargs.get("end_date"), start_dt + datetime.timedelta(days=7))
     if end_dt < start_dt:
         update_task_status(task_id, 2)
         logger.error(f"end_date 不能早于 start_date")
         return
-    logger.info(
-        f"开始聚合 {start_dt} - {end_dt} 数据，粒度 {aggregation_interval}"
-    )
+    logger.info(f"开始聚合 {start_dt} - {end_dt} 数据，粒度 {aggregation_interval}")
 
     conn = psycopg2.connect(
         host=DEFAULT_DB_CONFIG["host"],
@@ -153,12 +155,17 @@ def run_process_prices(
         update_task_status(task_id, 2)
         raise
     else:
-        logger.info(
-            f"聚合完成，共写入 {len(df_final)} 条记录，耗时 {duration:.2f}s"
-        )
+        logger.info(f"聚合完成，共写入 {len(df_final)} 条记录，耗时 {duration:.2f}s")
         update_task_status(task_id, 1)
     finally:
         conn.close()
 
+
 if __name__ == "__main__":
-    run_process_prices(task_id="1", aggregation_interval="minute", overwrite=True, start_date="2025-09-01", end_date="2025-09-07")
+    run_process_prices(
+        task_id="1",
+        aggregation_interval="minute",
+        overwrite=True,
+        start_date="2025-09-01",
+        end_date="2025-09-07",
+    )

@@ -25,10 +25,12 @@ with open("./config/config.yaml", "r", encoding="utf-8") as file:
 
 db_config = config.get("db", {})
 
+
 def _parse_timestamp(value: str) -> pd.Timestamp:
     if not value:
         return None
     return pd.to_datetime(value, utc=True, errors="raise")
+
 
 def fetch_price_pairs(
     conn,
@@ -163,15 +165,27 @@ def analyze_opportunities(price_pairs: list, strategy: dict[str, Any]):
 
     # 将 price_pairs 转为 DataFrame 以便计算波动率
     # 注意：现在多了 window_volume 列
-    df = pd.DataFrame(price_pairs, columns=["block_time", "uniswap_price", "gas_price", "window_volume", "binance_price"])
+    df = pd.DataFrame(
+        price_pairs,
+        columns=[
+            "block_time",
+            "uniswap_price",
+            "gas_price",
+            "window_volume",
+            "binance_price",
+        ],
+    )
     # 确保类型正确
     df["uniswap_price"] = pd.to_numeric(df["uniswap_price"], errors="coerce")
     df["binance_price"] = pd.to_numeric(df["binance_price"], errors="coerce")
     df["window_volume"] = pd.to_numeric(df["window_volume"], errors="coerce").fillna(0)
-    
+
     # 计算滑动窗口波动率 (Rolling Volatility)
     # 假设数据是按时间排序的。计算过去 10 个点的标准差作为波动率估计
-    df["volatility"] = df["uniswap_price"].rolling(window=10).std() / df["uniswap_price"].rolling(window=10).mean()
+    df["volatility"] = (
+        df["uniswap_price"].rolling(window=10).std()
+        / df["uniswap_price"].rolling(window=10).mean()
+    )
     df["volatility"] = df["volatility"].fillna(0)
 
     for index, row in df.iterrows():
@@ -213,7 +227,7 @@ def analyze_opportunities(price_pairs: list, strategy: dict[str, Any]):
                     "sell_price": float(binance_price),
                     "profit_usdt": float(profit),
                 }
-        
+
         if opp:
             # 集成风险分析
             risk_metrics = calculate_risk_metrics_local(
@@ -280,7 +294,7 @@ def save_results(
                     item["profit_usdt"],
                     Json(details),
                     # 独立存入 risk_metrics_json
-                    Json(item.get("risk_metrics", {}))
+                    Json(item.get("risk_metrics", {})),
                 )
             )
         execute_values(
@@ -291,7 +305,7 @@ def save_results(
             VALUES %s
             """,
             records,
-    )
+        )
     conn.commit()
     logger.info("写入完成并已提交。")
 

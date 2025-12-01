@@ -63,6 +63,7 @@ def count_lines(task_id: str, filepath: str) -> Optional[int]:
         update_task_status(task_id, "TASK_STATUS_FAILED")
         raise
 
+
 def process_chunk(
     task_id: str,
     chunk_data: pd.DataFrame,
@@ -120,7 +121,13 @@ def process_chunk(
         update_task_status(task_id, "TASK_STATUS_FAILED")
         raise
 
-def import_data_to_database(task_id: str, target_rows: Optional[int], total_lines: Optional[int], chunk_size: int):
+
+def import_data_to_database(
+    task_id: str,
+    target_rows: Optional[int],
+    total_lines: Optional[int],
+    chunk_size: int,
+):
     """
     描述：主导入逻辑：读取CSV，分块处理并写入数据库。
     参数：target_rows: 目标行数, total_lines: 总行数, chunk_size: 分块大小
@@ -180,6 +187,7 @@ def _calc_target_rows(
         return total_lines
     return math.ceil(total_lines * (import_percentage / 100))
 
+
 def collect_binance(
     task_id: str, csv_path: str, import_percentage: int, chunk_size: int
 ):
@@ -190,7 +198,9 @@ def collect_binance(
             logger.info(f"任务 {task_id} 已取消，停止导入 Binance 数据")
             return 0
         target_rows = _calc_target_rows(total_lines, import_percentage)
-        rows_counter = import_data_to_database(task_id, target_rows, total_lines, chunk_size)
+        rows_counter = import_data_to_database(
+            task_id, target_rows, total_lines, chunk_size
+        )
         total_time = time.time() - start_time
         if check_task(task_id):
             logger.info(f"任务 {task_id} 已取消，停止导入 Binance 数据")
@@ -202,6 +212,7 @@ def collect_binance(
         logger.error(f"导入 Binance 数据失败: {e}")
         update_task_status(task_id, "TASK_STATUS_FAILED")
         raise
+
 
 if __name__ == "__main__":
     collect_binance("1", csv_path, 1, 1000000)

@@ -8,6 +8,7 @@ with open("./config/config.yaml", "r", encoding="utf-8") as file:
 
 db_config = config.get("db", {})
 
+
 def check_task(task_id: str):
     """
     描述：检查任务是否被取消
@@ -23,7 +24,9 @@ def check_task(task_id: str):
             password=db_config["password"],
         ) as conn:
             with conn.cursor() as cursor:
-                cursor.execute("SELECT status FROM tasks WHERE task_id = %s", (str(task_id),))
+                cursor.execute(
+                    "SELECT status FROM tasks WHERE task_id = %s", (str(task_id),)
+                )
                 result = cursor.fetchone()
                 if result is None:
                     logger.error(f"任务 {task_id} 不存在")
@@ -32,6 +35,7 @@ def check_task(task_id: str):
     except Exception as e:
         logger.error(f"检查任务 {task_id} 失败: {e}")
         return True
+
 
 def update_task_status(task_id: str, status: str):
     try:
@@ -43,9 +47,13 @@ def update_task_status(task_id: str, status: str):
             password=db_config["password"],
         ) as conn:
             with conn.cursor() as cursor:
-                cursor.execute("UPDATE tasks SET status = %s WHERE task_id = %s", (status, str(task_id)))
+                cursor.execute(
+                    "UPDATE tasks SET status = %s WHERE task_id = %s",
+                    (status, str(task_id)),
+                )
     except Exception as e:
         logger.error(f"更新任务 {task_id} 状态失败: {e}")
+
 
 if __name__ == "__main__":
     print(check_task("1"))

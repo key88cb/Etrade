@@ -16,9 +16,8 @@ with open("./config/config.yaml", "r", encoding="utf-8") as file:
 db_config = config.get("db", {})
 graph_config = config.get("the_graph", {})
 
-def fetch_all_swaps(
-   task_id: str, pool_address: str, start_ts: int, end_ts: int
-):
+
+def fetch_all_swaps(task_id: str, pool_address: str, start_ts: int, end_ts: int):
     """
     描述：通过分页获取指定时间范围内的所有Swap数据。
     参数：
@@ -68,7 +67,10 @@ def fetch_all_swaps(
         )
         try:
             response = requests.post(
-                graph_config['graph_api_url'], json={"query": query}, headers=headers, timeout=30
+                graph_config["graph_api_url"],
+                json={"query": query},
+                headers=headers,
+                timeout=30,
             )
             response.raise_for_status()
             swaps = response.json()["data"]["swaps"]
@@ -86,7 +88,9 @@ def fetch_all_swaps(
     return all_swaps
 
 
-def process_and_store_uniswap_data(task_id: str, swaps_data: Iterable[dict[str, Any]]) -> int:
+def process_and_store_uniswap_data(
+    task_id: str, swaps_data: Iterable[dict[str, Any]]
+) -> int:
     """
     描述：处理数据并存入数据库。
     参数：
@@ -140,21 +144,22 @@ def process_and_store_uniswap_data(task_id: str, swaps_data: Iterable[dict[str, 
     return len(records)
 
 
-def collect_uniswap(
-    task_id: str, pool_address: str, start_ts: int, end_ts: int
-) -> int:
+def collect_uniswap(task_id: str, pool_address: str, start_ts: int, end_ts: int) -> int:
     try:
         swaps = fetch_all_swaps(task_id, pool_address, start_ts, end_ts)
         if check_task(task_id):
             logger.info(f"任务 {task_id} 已取消，停止写入 Uniswap 数据")
             return 0
         rows_counter = process_and_store_uniswap_data(task_id, swaps)
-        update_task_status(task_id, 1)
+        update_task_status(task_id, "TASK_STATUS_SUCCESS")
         return rows_counter
     except Exception as e:
         logger.error(f"获取Uniswap数据失败: {e}")
-        update_task_status(task_id, 2)
+        update_task_status(task_id, "TASK_STATUS_FAILED")
         return 0
 
+
 if __name__ == "__main__":
-    collect_uniswap(1, "0x11b815efb8f581194ae79006d24e0d814b7697f6", 1756684800, 1756771200)
+    collect_uniswap(
+        1, "0x11b815efb8f581194ae79006d24e0d814b7697f6", 1756684800, 1756771200
+    )

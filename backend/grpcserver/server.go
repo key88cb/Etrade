@@ -91,7 +91,7 @@ func (s *Server) createTask(ctx context.Context, taskID, taskType string, params
 func Run(cfg Config, taskManager *service.TaskManager) error {
 	port := cfg.Port
 	if port == "" {
-		port = ":50051"
+		port = ":50055"
 	} else if port[0] != ':' {
 		port = fmt.Sprintf(":%s", port)
 	}

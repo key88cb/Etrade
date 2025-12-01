@@ -16,10 +16,22 @@ with open("./config/config.yaml", "r", encoding="utf-8") as file:
 
 DEFAULT_DB_CONFIG = config.get("db", {})
 
-SQL_TEMPLATE = """
+    # 解析时间间隔
+interval_map = {
+    "1m": 60,
+    "5m": 300,
+    "15m": 900,
+    "1h": 3600,
+    "4h": 14400,
+    "1d": 86400,
+}
+
+# 使用数学取整法进行任意时间间隔分桶
+# 这种写法兼容性好，支持 5m, 15m 等非标准 date_trunc 粒度
+sql_query = """
 (
     SELECT 
-        date_trunc(%s, block_time) AS time_bucket,
+        to_timestamp(floor(extract(epoch from block_time) / %s) * %s) AS time_bucket,
         'Uniswap' AS source,
         AVG(price) AS average_price
     FROM 
@@ -27,12 +39,12 @@ SQL_TEMPLATE = """
     WHERE 
         block_time BETWEEN %s AND %s
     GROUP BY 
-        time_bucket
+        1
 )
 UNION ALL
 (
     SELECT 
-        date_trunc(%s, trade_time) AS time_bucket,
+        to_timestamp(floor(extract(epoch from trade_time) / %s) * %s) AS time_bucket,
         'Binance' AS source,
         AVG(price) AS average_price
     FROM 
@@ -40,7 +52,7 @@ UNION ALL
     WHERE 
         trade_time BETWEEN %s AND %s
     GROUP BY 
-        time_bucket
+        1
 );
 """
 
@@ -83,6 +95,8 @@ def _write_aggregated_prices(conn, df: pd.DataFrame, overwrite: bool):
 
 def run_process_prices(task_id: str, **kwargs: Any):
     aggregation_interval = kwargs.get("aggregation_interval", "minute")
+    # 默认使用 1 分钟 (60秒)
+    interval_seconds = interval_map.get(aggregation_interval, 60)
     overwrite = bool(kwargs.get("overwrite", True))
     start_dt = _parse_date(
         kwargs.get("start_date"),
@@ -120,14 +134,14 @@ def run_process_prices(task_id: str, **kwargs: Any):
             )
             try:
                 params = (
-                    aggregation_interval,
+                    interval_seconds, interval_seconds,
                     day_start,
                     day_end,
-                    aggregation_interval,
+                    interval_seconds, interval_seconds,
                     day_start,
                     day_end,
                 )
-                cur.execute(SQL_TEMPLATE, params)
+                cur.execute(sql_query, params)
                 rows = cur.fetchall()
                 if rows:
                     day_df = pd.DataFrame(

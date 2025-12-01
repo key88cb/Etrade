@@ -6,12 +6,11 @@ Risk analysis logic module.
 import math
 from typing import Any, Dict
 
-
 def calculate_risk_metrics_local(
     opportunity: Dict[str, Any],
     volatility: float,
     market_volume: float,
-    investment_usdt: float,
+    investment_usdt: float
 ) -> Dict[str, Any]:
     """
     计算单条机会的风险指标
@@ -22,28 +21,26 @@ def calculate_risk_metrics_local(
     :return: 包含 risk_score, slippage 等的字典
     """
     # 1. 计算交易规模 (ETH)
-    price = float(opportunity["buy_price"])
+    price = float(opportunity['buy_price'])
     trade_size_eth = investment_usdt / price if price > 0 else 0
-
+    
     # 2. 滑点估算 (Square Root Law)
     # Impact = c * sigma * sqrt(Q / V)
-    impact_constant = 2.0  # 冲击系数
-
+    impact_constant = 2.0 # 冲击系数
+    
     if market_volume <= 0:
         slippage_pct = 1.0
     else:
-        slippage_pct = (
-            impact_constant * volatility * math.sqrt(trade_size_eth / market_volume)
-        )
-
+        slippage_pct = impact_constant * volatility * math.sqrt(trade_size_eth / market_volume)
+    
     slippage_pct = min(slippage_pct, 1.0)
-
+    
     # 3. 预估滑点成本
     estimated_slippage_cost = investment_usdt * slippage_pct
-
+    
     # 4. 风险评分 (0-100)
-    profit = float(opportunity["profit_usdt"])
-
+    profit = float(opportunity['profit_usdt'])
+    
     if profit <= 0:
         risk_score = 0
     else:
@@ -59,5 +56,5 @@ def calculate_risk_metrics_local(
         "trade_size_eth": round(trade_size_eth, 4),
         "estimated_slippage_pct": round(slippage_pct * 100, 4),
         "estimated_slippage_cost": round(estimated_slippage_cost, 2),
-        "risk_score": round(risk_score, 1),
+        "risk_score": round(risk_score, 1)
     }

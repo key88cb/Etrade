@@ -21,7 +21,7 @@ def check_task(task_id: str):
         password=db_config["password"],
     ) as conn:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT status FROM task_results WHERE task_id = %s", (str(task_id),))
+            cursor.execute("SELECT status FROM tasks WHERE task_id = %s", (str(task_id),))
             return cursor.fetchone()[0] == 3 # TASK_STATUS_CANCELED
 
 def update_task_status(task_id: str, status: int):

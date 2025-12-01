@@ -273,11 +273,11 @@ class TaskService(TaskServiceServicer):
                 
                 if start_date:
                     dt = datetime.datetime.fromtimestamp(start_date, tz=datetime.timezone.utc)
-                    start_date_str = dt.strftime("%Y-%m-%d")
+                    start_date_str = dt.isoformat()
                 
                 if end_date:
                     dt = datetime.datetime.fromtimestamp(end_date, tz=datetime.timezone.utc)
-                    end_date_str = dt.strftime("%Y-%m-%d")
+                    end_date_str = dt.isoformat()
                 
                 # 准备参数
                 kwargs = {

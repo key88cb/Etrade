@@ -11,7 +11,12 @@
 }
 
 body {
-  @apply m-0 min-h-screen bg-[#0d1117] text-[#e6edf3];
+  @apply m-0 min-h-screen;
+  /* 浅色模式 */
+  @apply bg-white text-gray-900;
+  /* 暗色模式 */
+  @apply dark:bg-[#0d1117] dark:text-[#e6edf3];
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 #app {

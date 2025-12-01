@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
-import api, { ReportPayload } from '../api';
+import api, { type ReportPayload } from '../api';
 
 interface ReportItem {
   id: number;

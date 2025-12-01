@@ -1,29 +1,27 @@
 import datetime
 import json
 import os
+import sys
 import threading
 from concurrent import futures
-import os, sys
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # 项目根目录
-PROTO_DIR = os.path.join(BASE_DIR, "protos")
-for path in (BASE_DIR, PROTO_DIR):
-    if path not in sys.path:
-        sys.path.insert(0, path)
 
 import grpc
 import psycopg2
 import yaml
 from loguru import logger
 
+from block_chain import analyse, collect_binance, collect_uniswap, process_prices
+
 # 导入生成的代码
 from protos.task_pb2 import TaskResponse, TaskStatus
 from protos.task_pb2_grpc import TaskServiceServicer, add_TaskServiceServicer_to_server
-from block_chain import collect_binance, collect_uniswap, process_prices, analyse
 
 # 导入数据收集模块
 
 BASE_DIR = os.path.dirname(__file__)
-with open(os.path.join(BASE_DIR, "config", "config.yaml"), "r", encoding="utf-8") as cfg_file:
+with open(
+    os.path.join(BASE_DIR, "config", "config.yaml"), "r", encoding="utf-8"
+) as cfg_file:
     CONFIG = yaml.safe_load(cfg_file)
 DB_CONFIG = CONFIG.get("db", {})
 WORKER_PORT = str(CONFIG.get("worker_port", 50052))
@@ -34,6 +32,7 @@ STATUS_LABELS = {
     TaskStatus.TASK_STATUS_FAILED: "FAILED",
     TaskStatus.TASK_STATUS_CANCELED: "CANCELED",
 }
+
 
 def _get_db_connection():
     return psycopg2.connect(
@@ -101,7 +100,6 @@ def mark_task_finished(task_id: str, status: TaskStatus, summary: str | None = N
         logger.warning("更新任务结束状态失败: %s", exc)
 
 
-
 class TaskService(TaskServiceServicer):
     """实现 TaskService 的 gRPC 服务"""
 
@@ -120,10 +118,7 @@ class TaskService(TaskServiceServicer):
         )
 
         # 获取 CSV 文件路径（相对于 data 目录）
-        csv_path = os.path.join(
-            os.path.dirname(__file__), 
-            "ETHUSDT-trades-2025-09.csv"
-        )
+        csv_path = os.path.join(os.path.dirname(__file__), "ETHUSDT-trades-2025-09.csv")
 
         def run_task():
             """在后台线程中执行任务"""
@@ -139,7 +134,9 @@ class TaskService(TaskServiceServicer):
                 )
                 logger.info(f"任务 {task_id} 执行成功: 收集币安数据")
                 log_task_event(task_id, "INFO", "收集 Binance 数据完成")
-                mark_task_finished(task_id, TaskStatus.TASK_STATUS_SUCCESS, "Binance 数据导入完成")
+                mark_task_finished(
+                    task_id, TaskStatus.TASK_STATUS_SUCCESS, "Binance 数据导入完成"
+                )
             except Exception as e:
                 logger.error(f"任务 {task_id} 执行失败: {e}")
                 log_task_event(task_id, "ERROR", f"收集 Binance 数据失败: {e}")
@@ -187,7 +184,9 @@ class TaskService(TaskServiceServicer):
                 analyse.run_analyse(task_id=task_id, config_json=json.dumps(config))
                 logger.info("套利分析任务 %s 执行成功", task_id)
                 log_task_event(task_id, "INFO", "套利分析完成")
-                mark_task_finished(task_id, TaskStatus.TASK_STATUS_SUCCESS, "套利分析完成")
+                mark_task_finished(
+                    task_id, TaskStatus.TASK_STATUS_SUCCESS, "套利分析完成"
+                )
             except Exception as exc:
                 logger.error("套利分析任务 %s 执行失败: %s", task_id, exc)
                 log_task_event(task_id, "ERROR", f"套利分析失败: {exc}")
@@ -227,7 +226,9 @@ class TaskService(TaskServiceServicer):
                 )
                 logger.info(f"任务 {task_id} 执行成功: 收集 Uniswap 数据")
                 log_task_event(task_id, "INFO", "收集 Uniswap 数据完成")
-                mark_task_finished(task_id, TaskStatus.TASK_STATUS_SUCCESS, "Uniswap 数据采集完成")
+                mark_task_finished(
+                    task_id, TaskStatus.TASK_STATUS_SUCCESS, "Uniswap 数据采集完成"
+                )
             except Exception as e:
                 logger.error(f"任务 {task_id} 执行失败: {e}")
                 log_task_event(task_id, "ERROR", f"收集 Uniswap 数据失败: {e}")
@@ -265,12 +266,12 @@ class TaskService(TaskServiceServicer):
             """在后台线程中执行任务"""
             try:
                 logger.info(f"开始执行任务 {task_id}: 处理价格数据")
-                
+
                 # 将 int32 时间戳转换为日期字符串
                 # 假设 start_date 和 end_date 是 Unix 时间戳（秒）
                 start_date_str = None
                 end_date_str = None
-                
+
                 if start_date:
                     dt = datetime.datetime.fromtimestamp(start_date, tz=datetime.timezone.utc)
                     start_date_str = dt.isoformat()
@@ -281,20 +282,19 @@ class TaskService(TaskServiceServicer):
                 
                 # 准备参数
                 kwargs = {
-                    "aggregation_interval": aggregation_interval if aggregation_interval else "minute",
+                    "aggregation_interval": (
+                        aggregation_interval if aggregation_interval else "minute"
+                    ),
                     "overwrite": overwrite,
                     "start_date": start_date_str,
                     "end_date": end_date_str,
                 }
-                
+
                 # 合并 db_overrides（如果有）
                 if db_overrides:
                     kwargs.update(db_overrides)
-                
-                process_prices.run_process_prices(
-                    task_id=task_id,
-                    **kwargs
-                )
+
+                process_prices.run_process_prices(task_id=task_id, **kwargs)
                 logger.info(f"任务 {task_id} 执行成功: 处理价格数据")
             except Exception as e:
                 logger.error(f"任务 {task_id} 执行失败: {e}")
@@ -328,7 +328,7 @@ class TaskService(TaskServiceServicer):
             """在后台线程中执行任务"""
             try:
                 logger.info(f"开始执行任务 {task_id}: 分析数据")
-                
+
                 # 解析策略 JSON
                 strategy_params = {}
                 if strategy_json:
@@ -337,7 +337,7 @@ class TaskService(TaskServiceServicer):
                     except json.JSONDecodeError as e:
                         logger.error(f"解析策略 JSON 失败: {e}")
                         raise ValueError(f"无效的策略 JSON: {e}")
-                
+
                 # 准备参数：先合并所有策略参数，然后添加控制参数
                 kwargs = {}
                 # 合并策略参数（所有策略参数都可以传入）
@@ -350,6 +350,8 @@ class TaskService(TaskServiceServicer):
                     task_id=task_id,
                     config_json=json.dumps(kwargs)
                 )
+
+                analyse.run_analyse(task_id=task_id, config_json=json.dumps(kwargs))
                 logger.info(f"任务 {task_id} 执行成功: 分析数据")
             except Exception as e:
                 logger.error(f"任务 {task_id} 执行失败: {e}")

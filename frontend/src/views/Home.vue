@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import {
   BarChart3,
   TrendingUp,
@@ -12,30 +12,86 @@ import {
 import PriceComparison from '../components/dashboard/PriceComparison.vue';
 import ArbitrageOpportunities from '../components/dashboard/ArbitrageOpportunities.vue';
 import DataManagement from '../components/dashboard/DataManagement.vue';
+import { isDarkMode, setThemeMode, getThemeMode } from '../utils/theme';
 
 type TabType = 'comparison' | 'arbitrage' | 'management';
 type Theme = 'light' | 'dark';
 
-const activeTab = ref<TabType>('comparison');
-const theme = ref<Theme>('dark');
+const TAB_STORAGE_KEY = 'home_active_tab';
+
+// 从 localStorage 读取保存的标签，如果没有则默认为 'comparison'
+const getSavedTab = (): TabType => {
+  const saved = localStorage.getItem(TAB_STORAGE_KEY);
+  if (saved && ['comparison', 'arbitrage', 'management'].includes(saved)) {
+    return saved as TabType;
+  }
+  return 'comparison';
+};
+
+const activeTab = ref<TabType>(getSavedTab());
 const currentTime = ref(new Date().toLocaleTimeString('en-US'));
 let timer: ReturnType<typeof setInterval> | null = null;
 
-const toggleTheme = () => {
-  theme.value = theme.value === 'dark' ? 'light' : 'dark';
+// 使用全局主题系统
+const darkModeState = ref(isDarkMode());
+const isDark = computed(() => darkModeState.value);
+const theme = computed<Theme>(() => isDark.value ? 'dark' : 'light');
+
+const updateDarkModeState = () => {
+  darkModeState.value = isDarkMode();
 };
+
+const toggleTheme = () => {
+  const currentMode = getThemeMode();
+  if (currentMode === 'auto') {
+    // 如果当前是 auto，切换到与当前实际主题相反的模式
+    setThemeMode(isDark.value ? 'light' : 'dark');
+  } else {
+    // 切换 light/dark
+    setThemeMode(currentMode === 'dark' ? 'light' : 'dark');
+  }
+  // 更新状态
+  updateDarkModeState();
+};
+
+// 监听 activeTab 变化并保存到 localStorage
+watch(activeTab, (newTab) => {
+  localStorage.setItem(TAB_STORAGE_KEY, newTab);
+});
 
 onMounted(() => {
   timer = setInterval(() => {
     currentTime.value = new Date().toLocaleTimeString('en-US');
   }, 1000);
+  
+  // 监听主题变化
+  const observer = new MutationObserver(() => {
+    updateDarkModeState();
+  });
+  
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+  
+  // 监听系统主题变化
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const handleSystemThemeChange = () => {
+    if (getThemeMode() === 'auto') {
+      updateDarkModeState();
+    }
+  };
+  
+  if (mediaQuery.addEventListener) {
+    mediaQuery.addEventListener('change', handleSystemThemeChange);
+  } else {
+    mediaQuery.addListener(handleSystemThemeChange);
+  }
 });
 
 onBeforeUnmount(() => {
   if (timer) clearInterval(timer);
 });
-
-const isDark = computed(() => theme.value === 'dark');
 
 const tabs: Array<{ id: TabType; label: string; icon: typeof BarChart3 }> = [
   { id: 'comparison', label: 'Price Comparison', icon: BarChart3 },

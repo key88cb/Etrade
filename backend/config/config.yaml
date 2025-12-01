@@ -1,13 +1,7 @@
-# db:
-#   host: localhost
-#   port: 5432
-#   username: postgres
-#   password: 123456
-#   database: etrade
-# grpc:
-#   port: ":50060"
-# worker:
-#   address: "127.0.0.1:50052"
+grpc:
+  port: ":50060"
+worker:
+  address: "127.0.0.1:50052"
 
 db:
   host: 121.196.205.18

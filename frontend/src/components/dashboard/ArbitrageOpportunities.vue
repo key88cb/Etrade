@@ -25,6 +25,13 @@ interface Props {
   theme: Theme;
 }
 
+interface RiskMetrics {
+  risk_score: number;
+  volatility: number;
+  estimated_slippage_pct: number;
+  market_volume_eth: number;
+}
+
 interface ApiOpportunity {
   id: number;
   batch_id?: number;
@@ -33,6 +40,7 @@ interface ApiOpportunity {
   buy_price: number;
   sell_price: number;
   profit_usdt: number;
+  risk_metrics: RiskMetrics;
   created_at?: string;
   timestamp?: string | number;
   details?: {
@@ -85,6 +93,12 @@ const textColor = computed(() => isDark.value ? '#e6edf3' : '#24292f');
 const secondaryTextColor = computed(() => isDark.value ? '#7d8590' : '#57606a');
 const backgroundColor = computed(() => isDark.value ? '#161b22' : 'white');
 const borderColor = computed(() => isDark.value ? '#30363d' : '#d0d7de');
+
+const getRiskColor = (score: number) => {
+  if (score >= 80) return 'text-[#3fb950]'; // Green
+  if (score >= 60) return 'text-[#d29922]'; // Orange
+  return 'text-[#f85149]'; // Red
+};
 
 const filteredOpportunities = computed(() => {
   if (!openedBatchIds.value.length) return [];
@@ -552,28 +566,100 @@ watch(() => totalPages.value, (pages) => { if (currentPage.value > pages) curren
         <table class="w-full">
           <thead :class="isDark ? 'bg-[#0d1117]' : 'bg-[#f6f8fa]'">
             <tr :class="isDark ? 'border-b border-[#30363d]' : 'border-b border-[#d0d7de]'">
-              <th class="px-4 py-3 text-left text-xs text-gray-500">ID</th>
-              <th class="px-4 py-3 text-left text-xs text-gray-500">Buy Platform</th>
-              <th class="px-4 py-3 text-left text-xs text-gray-500">Sell Platform</th>
-              <th class="px-4 py-3 text-right text-xs text-gray-500">Buy Price</th>
-              <th class="px-4 py-3 text-right text-xs text-gray-500">Sell Price</th>
-              <th class="px-4 py-3 text-right text-xs cursor-pointer hover:text-blue-500 text-gray-500" @click="handleSort('netProfit')">Net Profit</th>
+              <th class="px-4 py-3 text-left text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+                ID
+              </th>
+              <th class="px-4 py-3 text-left text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+                Buy Platform
+              </th>
+              <th class="px-4 py-3 text-left text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+                Sell Platform
+              </th>
+              <th class="px-4 py-3 text-right text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+                Buy Price
+              </th>
+              <th class="px-4 py-3 text-right text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+                Sell Price
+              </th>
+              <th class="px-4 py-3 text-center text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+                Risk Score
+              </th>
+              <th
+                class="px-4 py-3 text-right text-xs cursor-pointer"
+                :class="isDark ? 'text-[#7d8590] hover:text-[#58a6ff]' : 'text-[#57606a] hover:text-[#0969da]'"
+                @click="handleSort('netProfit')"
+              >
+                <span class="flex items-center justify-end gap-1">
+                  Net Profit
+                  <svg
+                    class="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m8 7 4-4 4 4m0 10-4 4-4-4" />
+                  </svg>
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody>
+            <tr v-if="!openedBatchIds.length">
+              <td colspan="7" class="px-4 py-6 text-center text-sm" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+                请选择左侧批次以查看套利数据。
+              </td>
+            </tr>
+            <tr v-else-if="isLoading">
+              <td colspan="7" class="px-4 py-6 text-center">
+                <Loader2 class="w-4 h-4 inline-block animate-spin mr-2 text-[#58a6ff]" />
+                <span :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">加载中...</span>
+              </td>
+            </tr>
             <tr
+              v-else-if="!filteredTotal"
+              :class="['border-b', isDark ? 'border-[#21262d]' : 'border-[#d0d7de]']"
+            >
+              <td colspan="7" class="px-4 py-6 text-center text-sm" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+                所选批次暂未生成套利机会。
+              </td>
+            </tr>
+            <tr
+              v-else
               v-for="opportunity in paginatedOpportunities"
               :key="`${opportunity.batch_id}-${opportunity.id}`"
               class="border-b transition-colors cursor-pointer"
               :class="isDark ? 'border-[#21262d] hover:bg-[#0d1117]' : 'border-[#d0d7de] hover:bg-[#f6f8fa]'"
               @click="openDetails(opportunity)" 
             >
-              <td class="px-4 py-3 text-sm text-blue-500 font-mono">{{ opportunity.id }}</td>
-              <td class="px-4 py-3 text-sm" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">{{ opportunity.buy_platform }}</td>
-              <td class="px-4 py-3 text-sm" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">{{ opportunity.sell_platform }}</td>
-              <td class="px-4 py-3 text-sm text-right" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">{{ formatCurrency(opportunity.buy_price) }}</td>
-              <td class="px-4 py-3 text-sm text-right" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">{{ formatCurrency(opportunity.sell_price) }}</td>
-              <td class="px-4 py-3 text-sm text-right text-[#3fb950] font-semibold">{{ formatCurrency(opportunity.profit_usdt) }}</td>
+              <td class="px-4 py-3 text-sm" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">
+                {{ opportunity.id }}
+              </td>
+              <td class="px-4 py-3 text-sm" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+                {{ opportunity.buy_platform || '--' }}
+              </td>
+              <td class="px-4 py-3 text-sm" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+                {{ opportunity.sell_platform || '--' }}
+              </td>
+              <td class="px-4 py-3 text-sm text-right" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">
+                {{ formatCurrency(opportunity.buy_price ?? 0) }}
+              </td>
+              <td class="px-4 py-3 text-sm text-right" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">
+                {{ formatCurrency(opportunity.sell_price ?? 0) }}
+              </td>
+              <td class="px-4 py-3 text-sm text-center">
+                <div>
+                  <span class="font-bold" :class="getRiskColor(opportunity.risk_metrics.risk_score)">
+                    {{ opportunity.risk_metrics.risk_score }}
+                  </span>
+                  <div class="text-[10px]" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">
+                    Slippage: {{ opportunity.risk_metrics.estimated_slippage_pct.toFixed(2) }}%
+                  </div>
+                </div>
+              </td>
+              <td class="px-4 py-3 text-sm text-right text-[#3fb950]">
+                {{ formatCurrency(opportunity.profit_usdt ?? 0) }}
+              </td>
             </tr>
           </tbody>
         </table>

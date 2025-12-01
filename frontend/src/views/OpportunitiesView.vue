@@ -243,6 +243,18 @@
                   </template>
                 </a-statistic>
               </template>
+
+              <template v-else-if="column.key === 'risk_score'">
+                <div v-if="record.risk_metrics">
+                  <a-tag :color="getRiskColor(record.risk_metrics.risk_score)">
+                    {{ record.risk_metrics.risk_score }}
+                  </a-tag>
+                  <div class="text-xs text-gray-400 mt-1">
+                    滑点: {{ record.risk_metrics.estimated_slippage_pct }}%
+                  </div>
+                </div>
+                <span v-else class="text-gray-300">-</span>
+              </template>
             </template>
           </a-table>
 
@@ -281,6 +293,13 @@ import {
   LineChartOutlined
 } from '@ant-design/icons-vue';
 
+interface RiskMetrics {
+  risk_score: number;
+  volatility: number;
+  estimated_slippage_pct: number;
+  market_volume_eth: number;
+}
+
 interface Opportunity {
   id: number;
   buy_platform: string;
@@ -289,6 +308,7 @@ interface Opportunity {
   sell_price: number;
   profit_usdt: number;
   batch_id?: number;
+  risk_metrics?: RiskMetrics;
 }
 
 interface Batch {
@@ -359,6 +379,15 @@ const columns = [
     sorter: (a: Opportunity, b: Opportunity) => a.profit_usdt - b.profit_usdt,
     defaultSortOrder: 'descend' as const,
   },
+  {
+    title: '风险评分',
+    dataIndex: ['risk_metrics', 'risk_score'],
+    key: 'risk_score',
+    width: 120,
+    align: 'center' as const,
+    sorter: (a: Opportunity, b: Opportunity) => 
+      (a.risk_metrics?.risk_score ?? 0) - (b.risk_metrics?.risk_score ?? 0),
+  },
 ];
 
 const reportColumns = [
@@ -414,6 +443,12 @@ const reportBatchPlaceholder = computed(() => {
 const rowKey = (record: Opportunity) => `${record.batch_id ?? 'N/A'}-${record.id}`;
 
 const isBatchOpened = (batchId: number) => openedBatchIds.value.includes(batchId);
+
+const getRiskColor = (score: number) => {
+  if (score >= 80) return 'green';
+  if (score >= 60) return 'orange';
+  return 'red';
+};
 
 const applyBatchFilter = () => {
   const ids = openedBatchIds.value;
@@ -475,7 +510,15 @@ const fetchOpportunities = async () => {
     const response = await api.getOpportunities();
     
     if (response.data && response.data.code === 200) {
-      allOpportunities.value = response.data.data || [];
+      const data = response.data.data;
+      // 兼容后端返回 { items: [], pagination: {} } 或直接返回 [] 的情况
+      if (Array.isArray(data)) {
+        allOpportunities.value = data;
+      } else if (data && Array.isArray(data.items)) {
+        allOpportunities.value = data.items;
+      } else {
+        allOpportunities.value = [];
+      }
     } else {
       error.value = response.data?.message || '获取数据失败，请检查数据格式';
       allOpportunities.value = [];

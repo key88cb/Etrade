@@ -341,14 +341,14 @@ class TaskService(TaskServiceServicer):
                 # 准备参数：先合并所有策略参数，然后添加控制参数
                 kwargs = {}
                 # 合并策略参数（所有策略参数都可以传入）
-                kwargs.update(strategy_params)
+                kwargs["strategy"] = strategy_params
                 # 添加控制参数
                 kwargs["batch_id"] = batch_id
                 kwargs["overwrite"] = overwrite  # overwrite=True 时重建表，overwrite=False 时追加数据
                 
                 analyse.run_analyse(
                     task_id=task_id,
-                    **kwargs
+                    config_json=json.dumps(kwargs)
                 )
                 logger.info(f"任务 {task_id} 执行成功: 分析数据")
             except Exception as e:

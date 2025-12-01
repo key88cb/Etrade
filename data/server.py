@@ -4,12 +4,6 @@ import os
 import threading
 from concurrent import futures
 import os, sys
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # 项目根目录
-PROTO_DIR = os.path.join(BASE_DIR, "protos")
-for path in (BASE_DIR, PROTO_DIR):
-    if path not in sys.path:
-        sys.path.insert(0, path)
-
 import grpc
 import psycopg2
 import yaml

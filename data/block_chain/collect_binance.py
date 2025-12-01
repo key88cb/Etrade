@@ -56,11 +56,11 @@ def count_lines(task_id: str, filepath: str) -> Optional[int]:
         return count
     except FileNotFoundError:
         logger.error(f"找不到CSV文件 '{filepath}'。请检查路径是否正确。")
-        update_task_status(task_id, 2)
+        update_task_status(task_id, "TASK_STATUS_FAILED")
         raise
     except Exception as e:
         logger.warning(f"估算行数失败: {e}. 无法按百分比导入。")
-        update_task_status(task_id, 2)
+        update_task_status(task_id, "TASK_STATUS_FAILED")
         raise
 
 def process_chunk(
@@ -117,7 +117,7 @@ def process_chunk(
         return True, original_chunk_len, rows_imported, should_stop
     except Exception as e:
         logger.error(f"处理分块时发生意外错误: {e}")
-        update_task_status(task_id, 2)
+        update_task_status(task_id, "TASK_STATUS_FAILED")
         raise
 
 def import_data_to_database(task_id: str, target_rows: Optional[int], total_lines: Optional[int], chunk_size: int):
@@ -161,12 +161,12 @@ def import_data_to_database(task_id: str, target_rows: Optional[int], total_line
                 break
     except FileNotFoundError:
         logger.error(f"找不到CSV文件 '{csv_path}'。请检查路径是否正确。")
-        update_task_status(task_id, 2)
+        update_task_status(task_id, "TASK_STATUS_FAILED")
         raise
     except Exception as e:
         logger.error(f"处理文件时发生意外错误: {e}")
         traceback.print_exc(file=sys.stderr)
-        update_task_status(task_id, 2)
+        update_task_status(task_id, "TASK_STATUS_FAILED")
         raise
     return rows_counter
 
@@ -196,11 +196,11 @@ def collect_binance(
             logger.info(f"任务 {task_id} 已取消，停止导入 Binance 数据")
             return 0
         logger.info(f"成功导入 {rows_counter[1]} 行，耗时 {total_time:.2f}s")
-        update_task_status(task_id, 1)
+        update_task_status(task_id, "TASK_STATUS_SUCCESS")
         return rows_counter[1]
     except Exception as e:
         logger.error(f"导入 Binance 数据失败: {e}")
-        update_task_status(task_id, 2)
+        update_task_status(task_id, "TASK_STATUS_FAILED")
         raise
 
 if __name__ == "__main__":

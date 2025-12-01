@@ -25,7 +25,7 @@ func main() {
 	}
 	// 1. 初始化数据库连接
 	if err := db.InitDB(); err != nil {
-		log.Printf("Failed to initialize database: %v", err)
+		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	taskManager := service.NewTaskManager(db.GetDB())
 	var dispatcher service.TaskDispatcher

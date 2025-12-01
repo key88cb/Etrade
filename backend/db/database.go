@@ -61,5 +61,8 @@ func InitDB() error {
 }
 
 func GetDB() *gorm.DB {
+	if database == nil {
+		log.Panic("Database is not initialized. Call InitDB() first.")
+	}
 	return database
 }

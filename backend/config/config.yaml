@@ -4,8 +4,8 @@ worker:
   address: "127.0.0.1:50052"
 
 db:
-  host: 121.196.205.18
+  host:
   port: 5432
-  username: postgres
-  password: etrade2025
+  username: 
+  password: 
   database: etrade

@@ -5,6 +5,27 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>etrade_frontend</title>
+    <script>
+      // 在页面加载前立即应用主题，避免闪烁
+      (function() {
+        const themeKey = 'app-theme-preference';
+        const stored = localStorage.getItem(themeKey);
+        let isDark = false;
+        
+        if (stored === 'dark') {
+          isDark = true;
+        } else if (stored === 'light') {
+          isDark = false;
+        } else {
+          // auto 模式：使用系统偏好
+          isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+        
+        if (isDark) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

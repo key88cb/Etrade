@@ -138,7 +138,7 @@ jobs:
     - name: Run pytest with coverage
       working-directory: ./data
       run: |
-        pytest --cov=block_chain --cov-report=html --cov-report=term --cov-report=xml -v test/
+        pytest ./test --cov=./block_chain --cov-report=html -v test/
 
     - name: Upload coverage report
       uses: actions/upload-artifact@v4

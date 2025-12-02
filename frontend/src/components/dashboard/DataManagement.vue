@@ -188,10 +188,12 @@ const getTemplateConfig = (tpl: any) => {
   return tpl.config ?? tpl.ConfigJSON ?? tpl.config_json ?? tpl.Config ?? {};
 };
 
+/*
 const formatTemplateConfig = (tpl: any) => {
   const cfg = getTemplateConfig(tpl);
   try { return JSON.stringify(cfg, null, 2); } catch { return String(cfg); }
 };
+*/
 
 const templateByType = computed<Record<PipelineTaskType, any | undefined>>(() => {
   const base: Record<PipelineTaskType, any | undefined> = {

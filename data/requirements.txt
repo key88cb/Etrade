@@ -6,6 +6,7 @@ protobuf~=6.33.1
 psycopg2~=2.9.11
 psycopg2_binary~=2.9.11
 pytest~=7.4.4
+pytest-cov~=4.1.0
 PyYAML~=6.0.3
 Requests~=2.32.5
 task_client~=1.0.1

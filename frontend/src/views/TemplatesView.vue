@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import api, { TemplatePayload } from '../api';
+import api, { type TemplatePayload } from '../api';
 
 interface TemplateItem {
   id: number;

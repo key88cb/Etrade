@@ -25,10 +25,12 @@ with open("./config/config.yaml", "r", encoding="utf-8") as file:
 
 db_config = config.get("db", {})
 
+
 def _parse_timestamp(value: str) -> pd.Timestamp:
     if not value:
         return None
     return pd.to_datetime(value, utc=True, errors="raise")
+
 
 def fetch_price_pairs(
     conn,
@@ -225,7 +227,7 @@ def analyze_opportunities(price_pairs: list, strategy: dict[str, Any]):
                     "sell_price": float(binance_price),
                     "profit_usdt": float(profit),
                 }
-        
+
         if opp:
             # 集成风险分析
             risk_metrics = calculate_risk_metrics_local(
@@ -292,7 +294,7 @@ def save_results(
                     item["profit_usdt"],
                     Json(details),
                     # 独立存入 risk_metrics_json
-                    Json(item.get("risk_metrics", {}))
+                    Json(item.get("risk_metrics", {})),
                 )
             )
         execute_values(

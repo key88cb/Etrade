@@ -16,7 +16,7 @@ with open("./config/config.yaml", "r", encoding="utf-8") as file:
 
 DEFAULT_DB_CONFIG = config.get("db", {})
 
-    # 解析时间间隔
+# 解析时间间隔
 interval_map = {
     "1m": 60,
     "5m": 300,
@@ -134,10 +134,12 @@ def run_process_prices(task_id: str, **kwargs: Any):
             )
             try:
                 params = (
-                    interval_seconds, interval_seconds,
+                    interval_seconds,
+                    interval_seconds,
                     day_start,
                     day_end,
-                    interval_seconds, interval_seconds,
+                    interval_seconds,
+                    interval_seconds,
                     day_start,
                     day_end,
                 )

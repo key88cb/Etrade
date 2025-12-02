@@ -173,6 +173,11 @@ const loadModalChart = async (item: ApiOpportunity) => {
   const end = centerTime + range;
   const buyPrice = Number(item.buy_price);
   const sellPrice = Number(item.sell_price);
+  
+  // Binance和Uniswap两点之间应该有12秒偏差
+  const timeOffset = 12 * 1000;
+  const buyTime = centerTime;
+  const sellTime = centerTime + timeOffset;
 
   try {
     const { data } = await api.getPriceComparisonData({ startTime: start, endTime: end });
@@ -182,7 +187,7 @@ const loadModalChart = async (item: ApiOpportunity) => {
 
     const buyPoint = {
       name: 'Buy',
-      value: [centerTime, buyPrice],
+      value: [buyTime, buyPrice],
       itemStyle: { color: '#3fb950', borderColor: isDark.value ? '#0d1117' : '#ffffff', borderWidth: 2, shadowBlur: 5, shadowColor: 'rgba(0,0,0,0.3)' },
       label: { 
         show: true, position: 'bottom', formatter: () => `{b|BUY}\n{p|${item.buy_platform}}`, 
@@ -193,7 +198,7 @@ const loadModalChart = async (item: ApiOpportunity) => {
 
     const sellPoint = {
       name: 'Sell',
-      value: [centerTime, sellPrice],
+      value: [sellTime, sellPrice],
       itemStyle: { color: '#f85149', borderColor: isDark.value ? '#0d1117' : '#ffffff', borderWidth: 2, shadowBlur: 5, shadowColor: 'rgba(0,0,0,0.3)' },
       label: { 
         show: true, position: 'top', formatter: () => `{b|SELL}\n{p|${item.sell_platform}}`,
@@ -202,7 +207,7 @@ const loadModalChart = async (item: ApiOpportunity) => {
       }
     };
 
-    const spreadLineData = [[{ coord: [centerTime, buyPrice], symbol: 'none' }, { coord: [centerTime, sellPrice], symbol: 'none' }]];
+    const spreadLineData = [[{ coord: [buyTime, buyPrice], symbol: 'none' }, { coord: [sellTime, sellPrice], symbol: 'none' }]];
 
     const option: echarts.EChartsOption = {
       backgroundColor: 'transparent',

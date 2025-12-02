@@ -114,13 +114,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install black isort
 
-    #- name: Black check (data)
-    #  working-directory: ./data
-    #  run: black --check .
+    - name: Black check (data)
+      working-directory: ./data
+      run: black --check .
 
-    #- name: isort check (data)
-    #  working-directory: ./data
-    #  run: isort --check-only --profile black .
+    - name: isort check (data)
+      working-directory: ./data
+      run: isort --check-only --profile black .
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -135,15 +135,15 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # - name: Run pytest with coverage
-    #  working-directory: ./data
-    #  run: |
-    #    pytest --cov=block_chain --cov-report=html --cov-report=term --cov-report=xml -v test/
+    - name: Run pytest with coverage
+      working-directory: ./data
+      run: |
+        pytest --cov=block_chain --cov-report=html --cov-report=term --cov-report=xml -v test/
 
-    # - name: Upload coverage report
-    #  uses: actions/upload-artifact@v4
-    #  if: always()
-    #  with:
-    #    name: coverage-report-data
-    #    path: data/htmlcov/
-    #    retention-days: 30
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-report-data
+        path: data/htmlcov/
+        retention-days: 30

@@ -30,8 +30,10 @@ class TestFetchAllSwaps:
     测试Uniswap数据获取函数
     """
 
+    @patch("block_chain.collect_uniswap.graph_config", {"api_key": "test_key", "graph_api_url": "http://test.url"})
     @patch("block_chain.collect_uniswap.requests.post")
-    def test_fetch_all_swaps_success(self, mock_post):
+    @patch("block_chain.collect_uniswap.check_task", return_value=False)
+    def test_fetch_all_swaps_success(self, mock_check_task, mock_post):
         """
         测试：成功获取swap数据
         """
@@ -70,36 +72,41 @@ class TestFetchAllSwaps:
             ),
         ]
 
-        result = fetch_all_swaps("0x123", 1725187200, 1725187260)
+        result = fetch_all_swaps("test_task", "0x123", 1725187200, 1725187260)
 
         assert len(result) == 2
         assert result[0]["id"] == "0x1"
         assert result[1]["id"] == "0x2"
 
+    @patch("block_chain.collect_uniswap.graph_config", {"api_key": "test_key", "graph_api_url": "http://test.url"})
     @patch("block_chain.collect_uniswap.requests.post")
     @patch("block_chain.collect_uniswap.time.sleep")
-    def test_fetch_all_swaps_handles_request_error(self, mock_sleep, mock_post):
+    @patch("block_chain.collect_uniswap.check_task", return_value=False)
+    def test_fetch_all_swaps_handles_request_error(self, mock_check_task, mock_sleep, mock_post):
         """
         测试：处理请求错误（重试机制）
         """
 
         # 第一次请求失败，第二次成功
+        import requests
         mock_post.side_effect = [
-            Exception("Network error"),
+            requests.exceptions.RequestException("Network error"),
             MagicMock(
                 json=lambda: {"data": {"swaps": []}},
                 raise_for_status=Mock(),
             ),
         ]
 
-        result = fetch_all_swaps("0x123", 1725187200, 1725187260)
+        result = fetch_all_swaps("test_task", "0x123", 1725187200, 1725187260)
 
         # 应该重试并最终返回空列表
         assert len(result) == 0
         assert mock_sleep.called  # 应该调用了sleep等待重试
 
+    @patch("block_chain.collect_uniswap.graph_config", {"api_key": "test_key", "graph_api_url": "http://test.url"})
     @patch("block_chain.collect_uniswap.requests.post")
-    def test_fetch_all_swaps_pagination(self, mock_post):
+    @patch("block_chain.collect_uniswap.check_task", return_value=False)
+    def test_fetch_all_swaps_pagination(self, mock_check_task, mock_post):
         """
         测试：分页获取数据
         """
@@ -142,7 +149,7 @@ class TestFetchAllSwaps:
             ),
         ]
 
-        result = fetch_all_swaps("0x123", 1725187200, 1725187260)
+        result = fetch_all_swaps("test_task", "0x123", 1725187200, 1725187260)
 
         assert len(result) == 1500
         assert mock_post.call_count == 3  # 三次API调用
@@ -154,14 +161,18 @@ class TestProcessAndStoreUniswapData:
     """
 
     @patch("block_chain.collect_uniswap.execute_values")
+    @patch("block_chain.collect_uniswap.psycopg2.connect")
     def test_process_and_store_uniswap_data_success(
-        self, mock_execute_values, mock_db_connection
+        self, mock_connect, mock_execute_values, mock_db_connection
     ):
         """
         测试：成功处理和存储数据
         """
 
         mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value.__enter__ = lambda x: mock_conn
+        mock_connect.return_value.__exit__ = lambda *args: None
+        
         swaps_data = [
             {
                 "id": "0x1",
@@ -179,22 +190,26 @@ class TestProcessAndStoreUniswapData:
             },
         ]
 
-        process_and_store_uniswap_data(swaps_data, mock_conn)
+        result = process_and_store_uniswap_data("test_task", swaps_data)
 
         # 验证execute_values被调用
         mock_execute_values.assert_called_once()
-        # 验证数据被处理（应该计算了价格）
-        assert mock_conn.__enter__.called
+        # 验证返回了记录数量
+        assert result == 2
 
     @patch("block_chain.collect_uniswap.execute_values")
+    @patch("block_chain.collect_uniswap.psycopg2.connect")
     def test_process_and_store_uniswap_data_calculates_price(
-        self, mock_execute_values, mock_db_connection
+        self, mock_connect, mock_execute_values, mock_db_connection
     ):
         """
         测试：价格计算是否正确
         """
 
         mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value.__enter__ = lambda x: mock_conn
+        mock_connect.return_value.__exit__ = lambda *args: None
+        
         swaps_data = [
             {
                 "id": "0x1",
@@ -205,23 +220,26 @@ class TestProcessAndStoreUniswapData:
             },
         ]
 
-        process_and_store_uniswap_data(swaps_data, mock_conn)
+        result = process_and_store_uniswap_data("test_task", swaps_data)
 
         # 价格应该是 amount1 / amount0 = 3000.0 / 1.0 = 3000.0
         # 验证execute_values被调用
         mock_execute_values.assert_called_once()
-        # 由于我们mock了数据库，无法直接验证，但可以验证函数执行成功
-        assert mock_conn.__enter__.called
+        assert result == 1
 
     @patch("block_chain.collect_uniswap.execute_values")
+    @patch("block_chain.collect_uniswap.psycopg2.connect")
     def test_process_and_store_uniswap_data_handles_zero_amount0(
-        self, mock_execute_values, mock_db_connection
+        self, mock_connect, mock_execute_values, mock_db_connection
     ):
         """
         测试：处理amount0为0的情况（应该跳过）
         """
 
         mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value.__enter__ = lambda x: mock_conn
+        mock_connect.return_value.__exit__ = lambda *args: None
+        
         swaps_data = [
             {
                 "id": "0x1",
@@ -239,13 +257,12 @@ class TestProcessAndStoreUniswapData:
             },
         ]
 
-        process_and_store_uniswap_data(swaps_data, mock_conn)
-
-        # 应该只处理了一条记录（跳过amount0=0的）
-        # 验证execute_values被调用（只处理了一条记录）
+        result = process_and_store_uniswap_data("test_task", swaps_data)
+        # 应该只处理一条记录（amount0为0的被跳过）
+        assert result == 1
         mock_execute_values.assert_called_once()
-        # 由于mock，我们只能验证函数执行成功
-        assert mock_conn.__enter__.called
+        # 验证连接被使用
+        assert mock_connect.called
 
     def test_process_and_store_uniswap_data_empty_data(self, mock_db_connection):
         """
@@ -254,7 +271,7 @@ class TestProcessAndStoreUniswapData:
 
         mock_conn, mock_cursor = mock_db_connection
 
-        process_and_store_uniswap_data([], mock_conn)
+        result = process_and_store_uniswap_data("test_task", [])
 
-        # 应该不执行数据库操作
-        mock_cursor.execute.assert_not_called()
+        # 应该返回0，不执行数据库操作
+        assert result == 0

@@ -34,35 +34,36 @@ class TestCountLines:
     """
 
     @patch("builtins.open", new_callable=mock_open, read_data="line1\nline2\nline3\n")
-    def test_count_lines_success(self, mock_file):
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    def test_count_lines_success(self, mock_check_task, mock_file):
         """
         测试：成功统计文件行数
         """
 
-        result = count_lines("test.csv")
+        result = count_lines("test_task", "test.csv")
 
         assert result == 3
-        mock_file.assert_called_once_with("test.csv", "rb")
+        mock_file.assert_called_once_with("test.csv", "r", encoding="utf-8")
 
     @patch("builtins.open", side_effect=FileNotFoundError)
-    def test_count_lines_file_not_found(self, mock_file):
+    @patch("block_chain.collect_binance.update_task_status")
+    def test_count_lines_file_not_found(self, mock_update_status, mock_file):
         """
         测试：文件不存在的情况
         """
 
-        result = count_lines("nonexistent.csv")
-
-        assert result is None
+        with pytest.raises(FileNotFoundError):
+            count_lines("test_task", "nonexistent.csv")
 
     @patch("builtins.open", side_effect=PermissionError("Permission denied"))
-    def test_count_lines_permission_error(self, mock_file):
+    @patch("block_chain.collect_binance.update_task_status")
+    def test_count_lines_permission_error(self, mock_update_status, mock_file):
         """
         测试：权限错误的情况
         """
 
-        result = count_lines("restricted.csv")
-
-        assert result is None
+        with pytest.raises(PermissionError):
+            count_lines("test_task", "restricted.csv")
 
 
 class TestProcessChunk:
@@ -96,16 +97,16 @@ class TestProcessChunk:
         mock_pbar = MagicMock()
         rows_counter = [0, 0]
 
-        success, rows_processed, rows_imported, should_stop = process_chunk(
-            sample_chunk,
-            0,
-            mock_conn,
-            "binance_trades",
-            mock_pbar,
-            rows_counter,
-            None,
-            "行",
-        )
+        with patch("block_chain.collect_binance.psycopg2.connect") as mock_connect:
+            mock_connect.return_value.__enter__ = lambda x: mock_conn
+            mock_connect.return_value.__exit__ = lambda *args: None
+            success, rows_processed, rows_imported, should_stop = process_chunk(
+                "test_task",
+                sample_chunk,
+                0,
+                rows_counter,
+                None,
+            )
 
         assert success is True
         assert rows_processed == len(sample_chunk)
@@ -124,16 +125,16 @@ class TestProcessChunk:
         mock_pbar = MagicMock()
         rows_counter = [0, 0]
 
-        process_chunk(
-            sample_chunk,
-            0,
-            mock_conn,
-            "binance_trades",
-            mock_pbar,
-            rows_counter,
-            None,
-            "行",
-        )
+        with patch("block_chain.collect_binance.psycopg2.connect") as mock_connect:
+            mock_connect.return_value.__enter__ = lambda x: mock_conn
+            mock_connect.return_value.__exit__ = lambda *args: None
+            process_chunk(
+                "test_task",
+                sample_chunk,
+                0,
+                rows_counter,
+                None,
+            )
 
         # 验证SQL中使用了正确的列名
         assert mock_cursor.copy_expert.called
@@ -162,16 +163,16 @@ class TestProcessChunk:
 
         mock_cursor.copy_expert.side_effect = mock_copy_expert
 
-        process_chunk(
-            sample_chunk,
-            0,
-            mock_conn,
-            "binance_trades",
-            mock_pbar,
-            rows_counter,
-            None,
-            "行",
-        )
+        with patch("block_chain.collect_binance.psycopg2.connect") as mock_connect:
+            mock_connect.return_value.__enter__ = lambda x: mock_conn
+            mock_connect.return_value.__exit__ = lambda *args: None
+            process_chunk(
+                "test_task",
+                sample_chunk,
+                0,
+                rows_counter,
+                None,
+            )
 
         # 验证CSV数据包含时间戳（应该被转换为datetime格式）
         assert len(csv_data) > 0
@@ -180,21 +181,17 @@ class TestProcessChunk:
         """
         测试：处理空数据块
         """
-
-        empty_chunk = pd.DataFrame()
+        # 创建一个有列但无行的 DataFrame
+        empty_chunk = pd.DataFrame(columns=["id", "price", "qty", "quoteQty", "time", "isBuyerMaker", "isBestMatch"])
         mock_conn, mock_cursor = mock_db_connection
-        mock_pbar = MagicMock()
         rows_counter = [0, 0]
 
         success, rows_processed, rows_imported, should_stop = process_chunk(
+            "test_task",
             empty_chunk,
             0,
-            mock_conn,
-            "binance_trades",
-            mock_pbar,
             rows_counter,
             None,
-            "行",
         )
 
         assert success is True
@@ -208,23 +205,22 @@ class TestProcessChunk:
 
         mock_conn, mock_cursor = mock_db_connection
         mock_cursor.copy_expert.side_effect = Exception("Database error")
-        mock_pbar = MagicMock()
         rows_counter = [0, 0]
 
-        success, rows_processed, rows_imported, should_stop = process_chunk(
-            sample_chunk,
-            0,
-            mock_conn,
-            "binance_trades",
-            mock_pbar,
-            rows_counter,
-            None,
-            "行",
-        )
-
-        assert success is False
-        assert rows_imported == 0
-        mock_conn.rollback.assert_called_once()
+        with patch("block_chain.collect_binance.psycopg2.connect") as mock_connect:
+            mock_connect.return_value.__enter__ = lambda x: mock_conn
+            mock_connect.return_value.__exit__ = lambda *args: None
+            with patch("block_chain.collect_binance.update_task_status") as mock_update_status:
+                with pytest.raises(Exception, match="Database error"):
+                    process_chunk(
+                        "test_task",
+                        sample_chunk,
+                        0,
+                        rows_counter,
+                        None,
+                    )
+                # 验证任务状态被更新为失败
+                mock_update_status.assert_called_once_with("test_task", "TASK_STATUS_FAILED")
 
     def test_process_chunk_stops_at_target_rows(self, mock_db_connection):
         """
@@ -248,16 +244,16 @@ class TestProcessChunk:
         rows_counter = [5, 5]  # 已经处理了5行
         target_rows = 10
 
-        success, rows_processed, rows_imported, should_stop = process_chunk(
-            large_chunk,
-            0,
-            mock_conn,
-            "binance_trades",
-            mock_pbar,
-            rows_counter,
-            target_rows,
-            "行",
-        )
+        with patch("block_chain.collect_binance.psycopg2.connect") as mock_connect:
+            mock_connect.return_value.__enter__ = lambda x: mock_conn
+            mock_connect.return_value.__exit__ = lambda *args: None
+            success, rows_processed, rows_imported, should_stop = process_chunk(
+                "test_task",
+                large_chunk,
+                0,
+                rows_counter,
+                target_rows,
+            )
 
         # 处理后总行数应该 >= target_rows (5 + 10 = 15 >= 10)
         assert rows_counter[0] >= target_rows
@@ -289,14 +285,11 @@ class TestProcessChunk:
         rows_counter = [0, 0]
 
         success, rows_processed, rows_imported, should_stop = process_chunk(
+            "test_task",
             chunk_with_invalid_timestamps,
             0,
-            mock_conn,
-            "binance_trades",
-            mock_pbar,
             rows_counter,
             None,
-            "行",
         )
 
         # 应该成功处理，但导入0行（因为所有时间戳都无效）
@@ -312,23 +305,21 @@ class TestProcessChunk:
         测试：使用"块"作为进度条单位
         """
         mock_conn, mock_cursor = mock_db_connection
-        mock_pbar = MagicMock()
         rows_counter = [0, 0]
 
-        success, rows_processed, rows_imported, should_stop = process_chunk(
-            sample_chunk,
-            0,
-            mock_conn,
-            "binance_trades",
-            mock_pbar,
-            rows_counter,
-            None,
-            "块",  # 使用"块"作为单位
-        )
+        with patch("block_chain.collect_binance.psycopg2.connect") as mock_connect:
+            mock_connect.return_value.__enter__ = lambda x: mock_conn
+            mock_connect.return_value.__exit__ = lambda *args: None
+            success, rows_processed, rows_imported, should_stop = process_chunk(
+                "test_task",
+                sample_chunk,
+                0,
+                rows_counter,
+                None,
+            )
 
         assert success is True
-        # 验证进度条更新了1（因为是"块"单位）
-        mock_pbar.update.assert_called_with(1)
+        assert rows_processed > 0
 
     def test_process_chunk_with_target_rows_not_reached(
         self, sample_chunk, mock_db_connection
@@ -341,16 +332,16 @@ class TestProcessChunk:
         rows_counter = [0, 0]
         target_rows = 100  # 目标行数很大
 
-        success, rows_processed, rows_imported, should_stop = process_chunk(
-            sample_chunk,
-            0,
-            mock_conn,
-            "binance_trades",
-            mock_pbar,
-            rows_counter,
-            target_rows,
-            "行",
-        )
+        with patch("block_chain.collect_binance.psycopg2.connect") as mock_connect:
+            mock_connect.return_value.__enter__ = lambda x: mock_conn
+            mock_connect.return_value.__exit__ = lambda *args: None
+            success, rows_processed, rows_imported, should_stop = process_chunk(
+                "test_task",
+                sample_chunk,
+                0,
+                rows_counter,
+                target_rows,
+            )
 
         assert success is True
         assert should_stop is False  # 未达到目标行数
@@ -362,17 +353,18 @@ class TestImportDataToDatabase:
     """
 
     @patch("block_chain.collect_binance.pd.read_csv")
-    @patch("block_chain.collect_binance.tqdm")
-    @patch("block_chain.collect_binance.logger")
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    @patch("block_chain.collect_binance.process_chunk")
+    @patch("block_chain.collect_binance.psycopg2.connect")
     def test_import_data_to_database_success(
-        self, mock_logger, mock_tqdm, mock_read_csv, mock_db_connection
+        self, mock_connect, mock_process_chunk, mock_check_task, mock_read_csv, mock_db_connection
     ):
         """
         测试：成功导入数据
         """
         mock_conn, mock_cursor = mock_db_connection
-        mock_pbar = MagicMock()
-        mock_tqdm.return_value = mock_pbar
+        mock_connect.return_value.__enter__ = lambda x: mock_conn
+        mock_connect.return_value.__exit__ = lambda *args: None
 
         # 创建模拟的chunk迭代器
         sample_chunk = pd.DataFrame(
@@ -387,26 +379,32 @@ class TestImportDataToDatabase:
             }
         )
         mock_read_csv.return_value = [sample_chunk]
+        # process_chunk 会修改 rows_counter，所以我们需要让它实际执行
+        def side_effect(task_id, chunk, idx, counter, target):
+            counter[0] += len(chunk)
+            counter[1] += len(chunk)
+            return (True, len(chunk), len(chunk), False)
+        mock_process_chunk.side_effect = side_effect
 
-        rows_counter = import_data_to_database(mock_conn, None, 100)
+        rows_counter = import_data_to_database("test_task", None, None, 100)
 
         assert len(rows_counter) == 2
         assert rows_counter[0] == 2  # 处理的行数
         assert rows_counter[1] == 2  # 导入的行数
-        mock_pbar.close.assert_called_once()
 
     @patch("block_chain.collect_binance.pd.read_csv")
-    @patch("block_chain.collect_binance.tqdm")
-    @patch("block_chain.collect_binance.logger")
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    @patch("block_chain.collect_binance.process_chunk")
+    @patch("block_chain.collect_binance.psycopg2.connect")
     def test_import_data_to_database_with_target_rows(
-        self, mock_logger, mock_tqdm, mock_read_csv, mock_db_connection
+        self, mock_connect, mock_process_chunk, mock_check_task, mock_read_csv, mock_db_connection
     ):
         """
         测试：带目标行数的导入
         """
         mock_conn, mock_cursor = mock_db_connection
-        mock_pbar = MagicMock()
-        mock_tqdm.return_value = mock_pbar
+        mock_connect.return_value.__enter__ = lambda x: mock_conn
+        mock_connect.return_value.__exit__ = lambda *args: None
 
         sample_chunk = pd.DataFrame(
             {
@@ -420,70 +418,67 @@ class TestImportDataToDatabase:
             }
         )
         mock_read_csv.return_value = [sample_chunk]
+        # 第一个chunk达到目标行数
+        def side_effect(task_id, chunk, idx, counter, target):
+            counter[0] += len(chunk)
+            counter[1] += len(chunk)
+            should_stop = counter[0] >= target if target else False
+            return (True, len(chunk), len(chunk), should_stop)
+        mock_process_chunk.side_effect = side_effect
 
-        rows_counter = import_data_to_database(mock_conn, 3, 100)
+        rows_counter = import_data_to_database("test_task", 3, None, 100)
 
         assert len(rows_counter) == 2
         # 应该达到目标行数并停止
         assert rows_counter[0] >= 3
-        mock_pbar.close.assert_called_once()
 
     @patch("block_chain.collect_binance.pd.read_csv")
-    @patch("block_chain.collect_binance.tqdm")
-    @patch("block_chain.collect_binance.logger")
+    @patch("block_chain.collect_binance.update_task_status")
     def test_import_data_to_database_file_not_found(
-        self, mock_logger, mock_tqdm, mock_read_csv, mock_db_connection
+        self, mock_update_status, mock_read_csv, mock_db_connection
     ):
         """
         测试：文件不存在的情况
         """
         mock_conn, mock_cursor = mock_db_connection
-        mock_pbar = MagicMock()
-        mock_tqdm.return_value = mock_pbar
 
         mock_read_csv.side_effect = FileNotFoundError("File not found")
 
-        rows_counter = import_data_to_database(mock_conn, None, 100)
-
-        assert len(rows_counter) == 2
-        assert rows_counter[0] == 0
-        assert rows_counter[1] == 0
-        mock_logger.error.assert_called()
-        mock_pbar.close.assert_called_once()
+        with pytest.raises(FileNotFoundError):
+            import_data_to_database("test_task", None, None, 100)
+        
+        mock_update_status.assert_called_once_with("test_task", "TASK_STATUS_FAILED")
 
     @patch("block_chain.collect_binance.pd.read_csv")
-    @patch("block_chain.collect_binance.tqdm")
-    @patch("block_chain.collect_binance.logger")
+    @patch("block_chain.collect_binance.update_task_status")
     def test_import_data_to_database_general_exception(
-        self, mock_logger, mock_tqdm, mock_read_csv, mock_db_connection
+        self, mock_update_status, mock_read_csv, mock_db_connection
     ):
         """
         测试：处理一般异常
         """
         mock_conn, mock_cursor = mock_db_connection
-        mock_pbar = MagicMock()
-        mock_tqdm.return_value = mock_pbar
 
         mock_read_csv.side_effect = Exception("Unexpected error")
 
-        rows_counter = import_data_to_database(mock_conn, None, 100)
-
-        assert len(rows_counter) == 2
-        mock_logger.error.assert_called()
-        mock_pbar.close.assert_called_once()
+        with pytest.raises(Exception, match="Unexpected error"):
+            import_data_to_database("test_task", None, None, 100)
+        
+        mock_update_status.assert_called_once_with("test_task", "TASK_STATUS_FAILED")
 
     @patch("block_chain.collect_binance.pd.read_csv")
-    @patch("block_chain.collect_binance.tqdm")
-    @patch("block_chain.collect_binance.logger")
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    @patch("block_chain.collect_binance.process_chunk")
+    @patch("block_chain.collect_binance.psycopg2.connect")
     def test_import_data_to_database_multiple_chunks(
-        self, mock_logger, mock_tqdm, mock_read_csv, mock_db_connection
+        self, mock_connect, mock_process_chunk, mock_check_task, mock_read_csv, mock_db_connection
     ):
         """
         测试：处理多个chunk
         """
         mock_conn, mock_cursor = mock_db_connection
-        mock_pbar = MagicMock()
-        mock_tqdm.return_value = mock_pbar
+        mock_connect.return_value.__enter__ = lambda x: mock_conn
+        mock_connect.return_value.__exit__ = lambda *args: None
 
         chunk1 = pd.DataFrame(
             {
@@ -508,26 +503,32 @@ class TestImportDataToDatabase:
             }
         )
         mock_read_csv.return_value = [chunk1, chunk2]
+        def side_effect(task_id, chunk, idx, counter, target):
+            counter[0] += len(chunk)
+            counter[1] += len(chunk)
+            return (True, len(chunk), len(chunk), False)
+        mock_process_chunk.side_effect = side_effect
 
-        rows_counter = import_data_to_database(mock_conn, None, 100)
+        rows_counter = import_data_to_database("test_task", None, None, 100)
 
         assert len(rows_counter) == 2
         assert rows_counter[0] == 4  # 处理了4行
         assert rows_counter[1] == 4  # 导入了4行
-        assert mock_cursor.copy_expert.call_count == 2  # 两个chunk都处理了
+        assert mock_process_chunk.call_count == 2  # 两个chunk都处理了
 
     @patch("block_chain.collect_binance.pd.read_csv")
-    @patch("block_chain.collect_binance.tqdm")
-    @patch("block_chain.collect_binance.logger")
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    @patch("block_chain.collect_binance.process_chunk")
+    @patch("block_chain.collect_binance.psycopg2.connect")
     def test_import_data_to_database_stops_at_target(
-        self, mock_logger, mock_tqdm, mock_read_csv, mock_db_connection
+        self, mock_connect, mock_process_chunk, mock_check_task, mock_read_csv, mock_db_connection
     ):
         """
         测试：达到目标行数时停止处理
         """
         mock_conn, mock_cursor = mock_db_connection
-        mock_pbar = MagicMock()
-        mock_tqdm.return_value = mock_pbar
+        mock_connect.return_value.__enter__ = lambda x: mock_conn
+        mock_connect.return_value.__exit__ = lambda *args: None
 
         # 第一个chunk达到目标行数
         chunk1 = pd.DataFrame(
@@ -553,11 +554,18 @@ class TestImportDataToDatabase:
             }
         )
         mock_read_csv.return_value = [chunk1, chunk2]
+        # 第一个chunk达到目标行数，返回 should_stop=True
+        def side_effect(task_id, chunk, idx, counter, target):
+            counter[0] += len(chunk)
+            counter[1] += len(chunk)
+            should_stop = counter[0] >= target if target else False
+            return (True, len(chunk), len(chunk), should_stop)
+        mock_process_chunk.side_effect = side_effect
 
-        rows_counter = import_data_to_database(mock_conn, 3, 100)
+        rows_counter = import_data_to_database("test_task", 3, None, 100)
 
         assert len(rows_counter) == 2
         # 应该只处理第一个chunk就停止（因为达到目标行数3）
         assert rows_counter[0] >= 3
         # 第二个chunk不应该被处理
-        assert mock_cursor.copy_expert.call_count == 1
+        assert mock_process_chunk.call_count == 1

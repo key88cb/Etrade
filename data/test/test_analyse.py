@@ -557,7 +557,7 @@ class TestSaveResults:
         mock_cur = MagicMock()
         mock_conn.cursor.return_value.__enter__ = lambda x: mock_cur
         mock_conn.cursor.return_value.__exit__ = lambda *args: None
-        
+
         results = [
             {
                 "block_time": pd.Timestamp("2025-09-01 10:00:00", tz="UTC"),
@@ -588,7 +588,7 @@ class TestSaveResults:
         mock_cur = MagicMock()
         mock_conn.cursor.return_value.__enter__ = lambda x: mock_cur
         mock_conn.cursor.return_value.__exit__ = lambda *args: None
-        
+
         results = []
 
         with patch("block_chain.analyse.logger") as mock_logger:

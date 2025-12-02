@@ -273,13 +273,17 @@ class TaskService(TaskServiceServicer):
                 end_date_str = None
 
                 if start_date:
-                    dt = datetime.datetime.fromtimestamp(start_date, tz=datetime.timezone.utc)
+                    dt = datetime.datetime.fromtimestamp(
+                        start_date, tz=datetime.timezone.utc
+                    )
                     start_date_str = dt.isoformat()
-                
+
                 if end_date:
-                    dt = datetime.datetime.fromtimestamp(end_date, tz=datetime.timezone.utc)
+                    dt = datetime.datetime.fromtimestamp(
+                        end_date, tz=datetime.timezone.utc
+                    )
                     end_date_str = dt.isoformat()
-                
+
                 # 准备参数
                 kwargs = {
                     "aggregation_interval": (
@@ -344,12 +348,11 @@ class TaskService(TaskServiceServicer):
                 kwargs["strategy"] = strategy_params
                 # 添加控制参数
                 kwargs["batch_id"] = batch_id
-                kwargs["overwrite"] = overwrite  # overwrite=True 时重建表，overwrite=False 时追加数据
-                
-                analyse.run_analyse(
-                    task_id=task_id,
-                    config_json=json.dumps(kwargs)
+                kwargs["overwrite"] = (
+                    overwrite  # overwrite=True 时重建表，overwrite=False 时追加数据
                 )
+
+                analyse.run_analyse(task_id=task_id, config_json=json.dumps(kwargs))
 
                 analyse.run_analyse(task_id=task_id, config_json=json.dumps(kwargs))
                 logger.info(f"任务 {task_id} 执行成功: 分析数据")

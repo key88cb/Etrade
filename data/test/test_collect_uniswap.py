@@ -30,7 +30,10 @@ class TestFetchAllSwaps:
     测试Uniswap数据获取函数
     """
 
-    @patch("block_chain.collect_uniswap.graph_config", {"api_key": "test_key", "graph_api_url": "http://test.url"})
+    @patch(
+        "block_chain.collect_uniswap.graph_config",
+        {"api_key": "test_key", "graph_api_url": "http://test.url"},
+    )
     @patch("block_chain.collect_uniswap.requests.post")
     @patch("block_chain.collect_uniswap.check_task", return_value=False)
     def test_fetch_all_swaps_success(self, mock_check_task, mock_post):
@@ -78,17 +81,23 @@ class TestFetchAllSwaps:
         assert result[0]["id"] == "0x1"
         assert result[1]["id"] == "0x2"
 
-    @patch("block_chain.collect_uniswap.graph_config", {"api_key": "test_key", "graph_api_url": "http://test.url"})
+    @patch(
+        "block_chain.collect_uniswap.graph_config",
+        {"api_key": "test_key", "graph_api_url": "http://test.url"},
+    )
     @patch("block_chain.collect_uniswap.requests.post")
     @patch("block_chain.collect_uniswap.time.sleep")
     @patch("block_chain.collect_uniswap.check_task", return_value=False)
-    def test_fetch_all_swaps_handles_request_error(self, mock_check_task, mock_sleep, mock_post):
+    def test_fetch_all_swaps_handles_request_error(
+        self, mock_check_task, mock_sleep, mock_post
+    ):
         """
         测试：处理请求错误（重试机制）
         """
 
         # 第一次请求失败，第二次成功
         import requests
+
         mock_post.side_effect = [
             requests.exceptions.RequestException("Network error"),
             MagicMock(
@@ -103,7 +112,10 @@ class TestFetchAllSwaps:
         assert len(result) == 0
         assert mock_sleep.called  # 应该调用了sleep等待重试
 
-    @patch("block_chain.collect_uniswap.graph_config", {"api_key": "test_key", "graph_api_url": "http://test.url"})
+    @patch(
+        "block_chain.collect_uniswap.graph_config",
+        {"api_key": "test_key", "graph_api_url": "http://test.url"},
+    )
     @patch("block_chain.collect_uniswap.requests.post")
     @patch("block_chain.collect_uniswap.check_task", return_value=False)
     def test_fetch_all_swaps_pagination(self, mock_check_task, mock_post):
@@ -172,7 +184,7 @@ class TestProcessAndStoreUniswapData:
         mock_conn, mock_cursor = mock_db_connection
         mock_connect.return_value.__enter__ = lambda x: mock_conn
         mock_connect.return_value.__exit__ = lambda *args: None
-        
+
         swaps_data = [
             {
                 "id": "0x1",
@@ -209,7 +221,7 @@ class TestProcessAndStoreUniswapData:
         mock_conn, mock_cursor = mock_db_connection
         mock_connect.return_value.__enter__ = lambda x: mock_conn
         mock_connect.return_value.__exit__ = lambda *args: None
-        
+
         swaps_data = [
             {
                 "id": "0x1",
@@ -239,7 +251,7 @@ class TestProcessAndStoreUniswapData:
         mock_conn, mock_cursor = mock_db_connection
         mock_connect.return_value.__enter__ = lambda x: mock_conn
         mock_connect.return_value.__exit__ = lambda *args: None
-        
+
         swaps_data = [
             {
                 "id": "0x1",

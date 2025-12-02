@@ -56,12 +56,12 @@ class TestCheckTask:
         mock_connect.return_value.__exit__ = lambda *args: None
         mock_conn.cursor.return_value.__enter__ = lambda x: mock_cursor
         mock_conn.cursor.return_value.__exit__ = lambda *args: None
-        
+
         # Mock返回已取消状态
         mock_cursor.fetchone.return_value = ("TASK_STATUS_CANCELED",)
-        
+
         result = check_task("test_task_1")
-        
+
         assert result is True
         mock_cursor.execute.assert_called_once()
 
@@ -76,12 +76,12 @@ class TestCheckTask:
         mock_connect.return_value.__exit__ = lambda *args: None
         mock_conn.cursor.return_value.__enter__ = lambda x: mock_cursor
         mock_conn.cursor.return_value.__exit__ = lambda *args: None
-        
+
         # Mock返回运行中状态
         mock_cursor.fetchone.return_value = ("TASK_STATUS_RUNNING",)
-        
+
         result = check_task("test_task_2")
-        
+
         assert result is False
         mock_cursor.execute.assert_called_once()
 
@@ -97,12 +97,12 @@ class TestCheckTask:
         mock_connect.return_value.__exit__ = lambda *args: None
         mock_conn.cursor.return_value.__enter__ = lambda x: mock_cursor
         mock_conn.cursor.return_value.__exit__ = lambda *args: None
-        
+
         # Mock返回None（任务不存在）
         mock_cursor.fetchone.return_value = None
-        
+
         result = check_task("nonexistent_task")
-        
+
         assert result is True  # 任务不存在时返回True（视为已取消）
         mock_logger.error.assert_called_once()
 
@@ -114,9 +114,9 @@ class TestCheckTask:
         """
         # Mock连接时抛出异常
         mock_connect.side_effect = Exception("Database connection error")
-        
+
         result = check_task("test_task_3")
-        
+
         assert result is True  # 异常时返回True（视为已取消）
         mock_logger.error.assert_called_once()
 
@@ -132,12 +132,12 @@ class TestCheckTask:
         mock_connect.return_value.__exit__ = lambda *args: None
         mock_conn.cursor.return_value.__enter__ = lambda x: mock_cursor
         mock_conn.cursor.return_value.__exit__ = lambda *args: None
-        
+
         # Mock执行查询时抛出异常
         mock_cursor.execute.side_effect = Exception("Query execution error")
-        
+
         result = check_task("test_task_4")
-        
+
         assert result is True  # 异常时返回True（视为已取消）
         mock_logger.error.assert_called_once()
 
@@ -158,9 +158,9 @@ class TestUpdateTaskStatus:
         mock_connect.return_value.__exit__ = lambda *args: None
         mock_conn.cursor.return_value.__enter__ = lambda x: mock_cursor
         mock_conn.cursor.return_value.__exit__ = lambda *args: None
-        
+
         update_task_status("test_task_1", "TASK_STATUS_COMPLETED")
-        
+
         mock_cursor.execute.assert_called_once()
         call_args = mock_cursor.execute.call_args
         assert "UPDATE tasks" in call_args[0][0]
@@ -177,9 +177,9 @@ class TestUpdateTaskStatus:
         mock_connect.return_value.__exit__ = lambda *args: None
         mock_conn.cursor.return_value.__enter__ = lambda x: mock_cursor
         mock_conn.cursor.return_value.__exit__ = lambda *args: None
-        
+
         update_task_status("test_task_2", 1)
-        
+
         mock_cursor.execute.assert_called_once()
         call_args = mock_cursor.execute.call_args
         assert call_args[0][1] == (1, "test_task_2")
@@ -192,9 +192,9 @@ class TestUpdateTaskStatus:
         """
         # Mock连接时抛出异常
         mock_connect.side_effect = Exception("Database connection error")
-        
+
         update_task_status("test_task_3", "TASK_STATUS_FAILED")
-        
+
         mock_logger.error.assert_called_once()
 
     @patch("block_chain.task.psycopg2.connect")
@@ -209,12 +209,12 @@ class TestUpdateTaskStatus:
         mock_connect.return_value.__exit__ = lambda *args: None
         mock_conn.cursor.return_value.__enter__ = lambda x: mock_cursor
         mock_conn.cursor.return_value.__exit__ = lambda *args: None
-        
+
         # Mock执行更新时抛出异常
         mock_cursor.execute.side_effect = Exception("Update execution error")
-        
+
         update_task_status("test_task_4", "TASK_STATUS_FAILED")
-        
+
         mock_logger.error.assert_called_once()
 
     @patch("block_chain.task.psycopg2.connect")
@@ -228,10 +228,9 @@ class TestUpdateTaskStatus:
         mock_connect.return_value.__exit__ = lambda *args: None
         mock_conn.cursor.return_value.__enter__ = lambda x: mock_cursor
         mock_conn.cursor.return_value.__exit__ = lambda *args: None
-        
+
         # 使用整数任务ID
         update_task_status(12345, "TASK_STATUS_RUNNING")
-        
+
         call_args = mock_cursor.execute.call_args
         assert call_args[0][1] == ("TASK_STATUS_RUNNING", "12345")
-

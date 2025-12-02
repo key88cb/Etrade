@@ -29,7 +29,7 @@ class TestLoadConfigFromString:
         """
         config_json = '{"strategy": {"initial_investment": 1000}, "batch_id": 1}'
         result = load_config_from_string(config_json)
-        
+
         assert isinstance(result, dict)
         assert result["strategy"]["initial_investment"] == 1000
         assert result["batch_id"] == 1
@@ -39,7 +39,7 @@ class TestLoadConfigFromString:
         测试：None值
         """
         result = load_config_from_string(None)
-        
+
         assert result == {}
         assert isinstance(result, dict)
 
@@ -48,7 +48,7 @@ class TestLoadConfigFromString:
         测试：空字符串
         """
         result = load_config_from_string("")
-        
+
         assert result == {}
         assert isinstance(result, dict)
 
@@ -57,7 +57,7 @@ class TestLoadConfigFromString:
         测试：只包含空白字符的字符串
         """
         result = load_config_from_string("   ")
-        
+
         assert result == {}
         assert isinstance(result, dict)
 
@@ -66,10 +66,10 @@ class TestLoadConfigFromString:
         测试：无效的JSON字符串
         """
         invalid_json = "{'invalid': json}"  # 使用单引号，不是有效的JSON
-        
+
         with patch("block_chain.utils.logger") as mock_logger:
             result = load_config_from_string(invalid_json)
-            
+
             assert result == {}
             assert isinstance(result, dict)
             # 验证警告日志被记录
@@ -80,10 +80,10 @@ class TestLoadConfigFromString:
         测试：格式错误的JSON字符串
         """
         malformed_json = '{"key": "value"'  # 缺少闭合括号
-        
+
         with patch("block_chain.utils.logger") as mock_logger:
             result = load_config_from_string(malformed_json)
-            
+
             assert result == {}
             assert isinstance(result, dict)
             mock_logger.warning.assert_called_once()
@@ -93,7 +93,7 @@ class TestLoadConfigFromString:
         测试：空的JSON对象
         """
         result = load_config_from_string("{}")
-        
+
         assert result == {}
         assert isinstance(result, dict)
 
@@ -101,7 +101,7 @@ class TestLoadConfigFromString:
         """
         测试：嵌套的JSON对象
         """
-        nested_json = '''
+        nested_json = """
         {
             "strategy": {
                 "initial_investment": 1000,
@@ -113,9 +113,9 @@ class TestLoadConfigFromString:
             "batch_id": 1,
             "overwrite": true
         }
-        '''
+        """
         result = load_config_from_string(nested_json)
-        
+
         assert result["strategy"]["initial_investment"] == 1000
         assert result["strategy"]["binance_fee_rate"] == 0.001
         assert result["strategy"]["nested"]["level"] == 3
@@ -128,7 +128,7 @@ class TestLoadConfigFromString:
         """
         json_with_array = '{"items": [1, 2, 3], "name": "test"}'
         result = load_config_from_string(json_with_array)
-        
+
         assert result["items"] == [1, 2, 3]
         assert result["name"] == "test"
 
@@ -138,7 +138,6 @@ class TestLoadConfigFromString:
         """
         json_with_special = '{"message": "Hello\\nWorld", "path": "/usr/bin"}'
         result = load_config_from_string(json_with_special)
-        
+
         assert result["message"] == "Hello\nWorld"
         assert result["path"] == "/usr/bin"
-

@@ -182,7 +182,17 @@ class TestProcessChunk:
         测试：处理空数据块
         """
         # 创建一个有列但无行的 DataFrame
-        empty_chunk = pd.DataFrame(columns=["id", "price", "qty", "quoteQty", "time", "isBuyerMaker", "isBestMatch"])
+        empty_chunk = pd.DataFrame(
+            columns=[
+                "id",
+                "price",
+                "qty",
+                "quoteQty",
+                "time",
+                "isBuyerMaker",
+                "isBestMatch",
+            ]
+        )
         mock_conn, mock_cursor = mock_db_connection
         rows_counter = [0, 0]
 
@@ -210,7 +220,9 @@ class TestProcessChunk:
         with patch("block_chain.collect_binance.psycopg2.connect") as mock_connect:
             mock_connect.return_value.__enter__ = lambda x: mock_conn
             mock_connect.return_value.__exit__ = lambda *args: None
-            with patch("block_chain.collect_binance.update_task_status") as mock_update_status:
+            with patch(
+                "block_chain.collect_binance.update_task_status"
+            ) as mock_update_status:
                 with pytest.raises(Exception, match="Database error"):
                     process_chunk(
                         "test_task",
@@ -220,7 +232,9 @@ class TestProcessChunk:
                         None,
                     )
                 # 验证任务状态被更新为失败
-                mock_update_status.assert_called_once_with("test_task", "TASK_STATUS_FAILED")
+                mock_update_status.assert_called_once_with(
+                    "test_task", "TASK_STATUS_FAILED"
+                )
 
     def test_process_chunk_stops_at_target_rows(self, mock_db_connection):
         """
@@ -357,7 +371,12 @@ class TestImportDataToDatabase:
     @patch("block_chain.collect_binance.process_chunk")
     @patch("block_chain.collect_binance.psycopg2.connect")
     def test_import_data_to_database_success(
-        self, mock_connect, mock_process_chunk, mock_check_task, mock_read_csv, mock_db_connection
+        self,
+        mock_connect,
+        mock_process_chunk,
+        mock_check_task,
+        mock_read_csv,
+        mock_db_connection,
     ):
         """
         测试：成功导入数据
@@ -379,11 +398,13 @@ class TestImportDataToDatabase:
             }
         )
         mock_read_csv.return_value = [sample_chunk]
+
         # process_chunk 会修改 rows_counter，所以我们需要让它实际执行
         def side_effect(task_id, chunk, idx, counter, target):
             counter[0] += len(chunk)
             counter[1] += len(chunk)
             return (True, len(chunk), len(chunk), False)
+
         mock_process_chunk.side_effect = side_effect
 
         rows_counter = import_data_to_database("test_task", None, None, 100)
@@ -397,7 +418,12 @@ class TestImportDataToDatabase:
     @patch("block_chain.collect_binance.process_chunk")
     @patch("block_chain.collect_binance.psycopg2.connect")
     def test_import_data_to_database_with_target_rows(
-        self, mock_connect, mock_process_chunk, mock_check_task, mock_read_csv, mock_db_connection
+        self,
+        mock_connect,
+        mock_process_chunk,
+        mock_check_task,
+        mock_read_csv,
+        mock_db_connection,
     ):
         """
         测试：带目标行数的导入
@@ -418,12 +444,14 @@ class TestImportDataToDatabase:
             }
         )
         mock_read_csv.return_value = [sample_chunk]
+
         # 第一个chunk达到目标行数
         def side_effect(task_id, chunk, idx, counter, target):
             counter[0] += len(chunk)
             counter[1] += len(chunk)
             should_stop = counter[0] >= target if target else False
             return (True, len(chunk), len(chunk), should_stop)
+
         mock_process_chunk.side_effect = side_effect
 
         rows_counter = import_data_to_database("test_task", 3, None, 100)
@@ -446,7 +474,7 @@ class TestImportDataToDatabase:
 
         with pytest.raises(FileNotFoundError):
             import_data_to_database("test_task", None, None, 100)
-        
+
         mock_update_status.assert_called_once_with("test_task", "TASK_STATUS_FAILED")
 
     @patch("block_chain.collect_binance.pd.read_csv")
@@ -463,7 +491,7 @@ class TestImportDataToDatabase:
 
         with pytest.raises(Exception, match="Unexpected error"):
             import_data_to_database("test_task", None, None, 100)
-        
+
         mock_update_status.assert_called_once_with("test_task", "TASK_STATUS_FAILED")
 
     @patch("block_chain.collect_binance.pd.read_csv")
@@ -471,7 +499,12 @@ class TestImportDataToDatabase:
     @patch("block_chain.collect_binance.process_chunk")
     @patch("block_chain.collect_binance.psycopg2.connect")
     def test_import_data_to_database_multiple_chunks(
-        self, mock_connect, mock_process_chunk, mock_check_task, mock_read_csv, mock_db_connection
+        self,
+        mock_connect,
+        mock_process_chunk,
+        mock_check_task,
+        mock_read_csv,
+        mock_db_connection,
     ):
         """
         测试：处理多个chunk
@@ -503,10 +536,12 @@ class TestImportDataToDatabase:
             }
         )
         mock_read_csv.return_value = [chunk1, chunk2]
+
         def side_effect(task_id, chunk, idx, counter, target):
             counter[0] += len(chunk)
             counter[1] += len(chunk)
             return (True, len(chunk), len(chunk), False)
+
         mock_process_chunk.side_effect = side_effect
 
         rows_counter = import_data_to_database("test_task", None, None, 100)
@@ -521,7 +556,12 @@ class TestImportDataToDatabase:
     @patch("block_chain.collect_binance.process_chunk")
     @patch("block_chain.collect_binance.psycopg2.connect")
     def test_import_data_to_database_stops_at_target(
-        self, mock_connect, mock_process_chunk, mock_check_task, mock_read_csv, mock_db_connection
+        self,
+        mock_connect,
+        mock_process_chunk,
+        mock_check_task,
+        mock_read_csv,
+        mock_db_connection,
     ):
         """
         测试：达到目标行数时停止处理
@@ -554,12 +594,14 @@ class TestImportDataToDatabase:
             }
         )
         mock_read_csv.return_value = [chunk1, chunk2]
+
         # 第一个chunk达到目标行数，返回 should_stop=True
         def side_effect(task_id, chunk, idx, counter, target):
             counter[0] += len(chunk)
             counter[1] += len(chunk)
             should_stop = counter[0] >= target if target else False
             return (True, len(chunk), len(chunk), should_stop)
+
         mock_process_chunk.side_effect = side_effect
 
         rows_counter = import_data_to_database("test_task", 3, None, 100)

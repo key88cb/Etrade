@@ -65,6 +65,35 @@ func (d *GRPCTaskDispatcher) Dispatch(ctx context.Context, task *models.Task) er
 			EndTs:       endTs,
 		})
 		return err
+	case "process_prices":
+		startDate := int32(parseTimeOrInt(task.ConfigJSON["start_date"]))
+		endDate := int32(parseTimeOrInt(task.ConfigJSON["end_date"]))
+		aggregationInterval := ""
+		if val, ok := task.ConfigJSON["aggregation_interval"]; ok && val != nil {
+			aggregationInterval = val.(string)
+		}
+		overwrite := asBool(task.ConfigJSON["overwrite"])
+		dbOverrides := make(map[string]string)
+		if val, ok := task.ConfigJSON["db_overrides"]; ok && val != nil {
+			if m, ok := val.(map[string]interface{}); ok {
+				for k, v := range m {
+					if s, ok := v.(string); ok {
+						dbOverrides[k] = s
+					}
+				}
+			} else if m, ok := val.(map[string]string); ok {
+				dbOverrides = m
+			}
+		}
+		_, err := d.client.ProcessPrices(reqCtx, &taskpb.ProcessPricesRequest{
+			TaskId:              task.TaskID,
+			StartDate:           startDate,
+			EndDate:             endDate,
+			AggregationInterval: aggregationInterval,
+			Overwrite:           overwrite,
+			DbOverrides:         dbOverrides,
+		})
+		return err
 	case "analyse":
 		batchID := int32(asInt64(task.ConfigJSON["batch_id"]))
 		overwrite := asBool(task.ConfigJSON["overwrite"])
@@ -84,6 +113,23 @@ func (d *GRPCTaskDispatcher) Dispatch(ctx context.Context, task *models.Task) er
 	default:
 		return fmt.Errorf("unsupported task type %s", task.Type)
 	}
+}
+
+func parseTimeOrInt(v interface{}) int64 {
+	if v == nil {
+		return 0
+	}
+	if s, ok := v.(string); ok {
+		// 尝试解析 ISO 时间
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			return t.Unix()
+		}
+		// 尝试解析其他常用格式
+		if t, err := time.Parse("2006-01-02T15:04:05", s); err == nil {
+			return t.Unix()
+		}
+	}
+	return asInt64(v)
 }
 
 func asInt64(v interface{}) int64 {

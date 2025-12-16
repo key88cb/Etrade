@@ -1,5 +1,11 @@
 # Etrade
 
+<div align=center>
+   <img src="https://img.shields.io/badge/gin-1.24-blue"/>
+   <img src="https://img.shields.io/badge/vue-3.5-green"/>
+   <img src="https://img.shields.io/badge/binance-uniswap-yellow"/>
+</div>
+
 ## 简介
 
 ### 功能
@@ -25,7 +31,6 @@ Etrade 是一个用于CEX-DEX套利分析的一站式平台，主要针对Uniswa
 npm install # 下载对应依赖
 npm run dev # 运行项目
 ```
-并配置好 config/config.yaml下的数据库连接信息
 
 前端项目结构，主要是src目录：
 
@@ -36,26 +41,21 @@ npm run dev # 运行项目
 - views：vue页面
 - app.vue/main.tx/style.css：一些全局配置
 
-可能会在`tsconfig.app.json`这类配置文件里面出现一些很奇怪的报错，如果经检查确实没什么问题，很有可能是因为缓存机制，把报错的语句/文件删除了再恢复一般就正常了，实在有无法修复的奇怪报错可以忽略。
-
 ### postgresql
 
-使用docker拉取，便于调整端口等配置。这里 postgresql 运行的端口用默认的 5432 端口（请确保这个端口可用，或者换到别的可用端口），默认用户名为postgres，密码就是123456，这个账号和密码用于访问数据库本身。
+可以使用docker拉取
 
 ```bash
 # 拉取 PostgreSQL
 docker pull postgres
-# 数据较多，最好创建一个数据卷
-docker volume inspect postgre-data
 # 运行，配置尽量不要改
 docker run --name postgresql \
   -e POSTGRES_PASSWORD=123456 \
   -p 5432:5432 \
-  -v postgre-data:/var/lib/postgresql/data \
   -d postgres
 ```
 
-PgAdmin用于查询和管理PostgreSQL，同样可以使用docker拉取，下面的邮箱t`est@123.com`和密码是用于访问PgAdmin ，但注意PgAdmin中输入docker部署的本地服务器ip地址时需要使用`host.docker.internal`，而不是`localhost`或者`127.0.0.1`
+PgAdmin（用于管理PostgreSQL）同样可以使用docker拉取，注意数据库的ip地址需要使用`host.docker.internal`
 
 ```bash
 # 一并拉取 pgadmin4 方便查询
@@ -78,7 +78,7 @@ go mod tidy # 自动处理依赖关系
 go run main.go # 运行项目，端口8888
 ```
 
-并配置好 config/config.yaml下的数据库连接信息
+需要配置好`config/config.yaml`下的数据库连接信息
 
 项目结构，MVC模式：
 - api：用于收发http请求
@@ -87,7 +87,7 @@ go run main.go # 运行项目，端口8888
 - service：业务逻辑，可以与数据库交互
 - utils：一些工具方法
 
-需要注意`utils/response.go`中定义了统一的后端返回方法，只需要直接在api层调用这些方法返回就行了，统一的格式为：
+`utils/response.go`中定义了统一的后端返回方法，直接在api层调用这些方法返回即可，统一的格式为：
 
 ```json
 {

@@ -1,5 +1,11 @@
 # Etrade
 
+<div align=center>
+   <img src="https://img.shields.io/badge/gin-1.24-blue"/>
+   <img src="https://img.shields.io/badge/vue-3.5-green"/>
+   <img src="https://img.shields.io/badge/binance-uniswap-yellow"/>
+</div>
+
 ## 简介
 
 ### 功能
@@ -41,6 +47,8 @@ npm run dev # 运行项目
 - assets：一些公用的 css 等资源
 - components：可复用的组件
 - router：动态路由组件
+- views：vue页面
+- app.vue/main.tx/style.css：一些全局配置
 - views：vue 页面
 - app.vue/main.ts/style.css：一些全局配置
 
@@ -48,21 +56,20 @@ npm run dev # 运行项目
 
 ### postgresql
 
+可以使用docker拉取
 使用 docker 拉取，便于调整端口等配置。这里 postgresql 运行的端口用默认的 5432 端口（请确保这个端口可用，或者换到别的可用端口），默认用户名为 postgres，密码就是 123456，这个账号和密码用于访问数据库本身。
 
 ```bash
 # 拉取 PostgreSQL
 docker pull postgres
-# 数据较多，最好创建一个数据卷
-docker volume inspect postgre-data
 # 运行，配置尽量不要改
 docker run --name postgresql \
   -e POSTGRES_PASSWORD=123456 \
   -p 5432:5432 \
-  -v postgre-data:/var/lib/postgresql/data \
   -d postgres
 ```
 
+PgAdmin（用于管理PostgreSQL）同样可以使用docker拉取，注意数据库的ip地址需要使用`host.docker.internal`
 PgAdmin 用于查询和管理 PostgreSQL，同样可以使用 docker 拉取，下面的邮箱 `test@123.com` 和密码是用于访问 PgAdmin，但注意 PgAdmin 中输入 docker 部署的本地服务器 ip 地址时需要使用 `host.docker.internal`，而不是 `localhost` 或者 `127.0.0.1`。
 
 ```bash
@@ -86,6 +93,7 @@ go mod tidy # 自动处理依赖关系
 go run main.go # 运行项目，端口 8888
 ```
 
+需要配置好`config/config.yaml`下的数据库连接信息
 并配置好：
 - `backend/config/config.yaml`：数据库连接 + `worker.address`（Python Worker 地址）
 
@@ -98,6 +106,7 @@ Swagger 地址：`http://localhost:8888/swagger/index.html`
 - service：业务逻辑，可以与数据库交互/派发 Worker 任务
 - utils：一些工具方法
 
+`utils/response.go`中定义了统一的后端返回方法，直接在api层调用这些方法返回即可，统一的格式为：
 需要注意 `utils/response.go` 中定义了统一的后端返回方法，只需要直接在 api 层调用这些方法返回就行了，统一的格式为：
 
 ```json

@@ -180,7 +180,9 @@ class TaskService(TaskServiceServicer):
                 logger.info(f"任务 {task_id} 执行成功: 按日期收集币安数据")
                 log_task_event(task_id, "INFO", "按日期收集 Binance 数据完成")
                 mark_task_finished(
-                    task_id, TaskStatus.TASK_STATUS_SUCCESS, "Binance 数据按日期收集完成"
+                    task_id,
+                    TaskStatus.TASK_STATUS_SUCCESS,
+                    "Binance 数据按日期收集完成",
                 )
             except Exception as e:
                 logger.error(f"任务 {task_id} 执行失败: {e}")

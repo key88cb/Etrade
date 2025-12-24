@@ -219,7 +219,9 @@ def collect_binance(
         raise
 
 
-def download_binance_file(task_id: str, date_str: str, symbol: str = "ETHUSDT") -> Optional[str]:
+def download_binance_file(
+    task_id: str, date_str: str, symbol: str = "ETHUSDT"
+) -> Optional[str]:
     """
     描述：从币安数据源下载指定日期的交易数据文件
     参数：task_id: 任务ID, date_str: 日期字符串 (YYYY-MM-DD), symbol: 交易对符号
@@ -227,16 +229,16 @@ def download_binance_file(task_id: str, date_str: str, symbol: str = "ETHUSDT") 
     """
     base_url = "https://data.binance.vision/data/spot/daily/trades"
     url = f"{base_url}/{symbol}/{symbol}-trades-{date_str}.zip"
-    
+
     try:
         logger.info(f"正在下载币安数据: {url}")
         response = requests.get(url, stream=True, timeout=30)
         response.raise_for_status()
-        
+
         # 创建临时目录保存文件
         temp_dir = tempfile.mkdtemp(prefix="binance_")
         zip_path = os.path.join(temp_dir, f"{symbol}-trades-{date_str}.zip")
-        
+
         # 下载zip文件
         with open(zip_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
@@ -247,7 +249,7 @@ def download_binance_file(task_id: str, date_str: str, symbol: str = "ETHUSDT") 
                         os.remove(zip_path)
                         os.rmdir(temp_dir)
                         return None
-        
+
         # 解压文件
         csv_path = None
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
@@ -258,17 +260,17 @@ def download_binance_file(task_id: str, date_str: str, symbol: str = "ETHUSDT") 
                 os.remove(zip_path)
                 os.rmdir(temp_dir)
                 return None
-            
+
             # 解压第一个CSV文件
             csv_filename = csv_files[0]
             zip_ref.extract(csv_filename, temp_dir)
             csv_path = os.path.join(temp_dir, csv_filename)
-        
+
         # 删除zip文件
         os.remove(zip_path)
         logger.info(f"成功下载并解压: {csv_path}")
         return csv_path
-        
+
     except requests.exceptions.RequestException as e:
         logger.error(f"下载币安数据失败: {e}")
         return None
@@ -281,7 +283,11 @@ def download_binance_file(task_id: str, date_str: str, symbol: str = "ETHUSDT") 
 
 
 def collect_binance_by_date(
-    task_id: str, start_ts: int, end_ts: int, symbol: str = "ETHUSDT", chunk_size: int = 1000000
+    task_id: str,
+    start_ts: int,
+    end_ts: int,
+    symbol: str = "ETHUSDT",
+    chunk_size: int = 1000000,
 ) -> int:
     """
     描述：按日期范围收集币安数据
@@ -295,41 +301,39 @@ def collect_binance_by_date(
     """
     try:
         start_time = time.time()
-        
+
         # 将时间戳转换为日期
         start_date = datetime.fromtimestamp(start_ts, tz=timezone.utc)
         end_date = datetime.fromtimestamp(end_ts, tz=timezone.utc)
-        
-        logger.info(
-            f"开始按日期收集币安数据: {start_date.date()} 到 {end_date.date()}"
-        )
-        
+
+        logger.info(f"开始按日期收集币安数据: {start_date.date()} 到 {end_date.date()}")
+
         total_rows_imported = 0
         temp_files = []  # 记录临时文件，用于清理
-        
+
         # 遍历日期范围
         current_date = start_date.date()
         end_date_only = end_date.date()
-        
+
         while current_date <= end_date_only:
             if check_task(task_id):
                 logger.info(f"任务 {task_id} 已取消，停止收集 Binance 数据")
                 break
-            
+
             date_str = current_date.strftime("%Y-%m-%d")
             logger.info(f"正在处理日期: {date_str}")
-            
+
             # 下载文件
             csv_path = download_binance_file(task_id, date_str, symbol)
-            
+
             if csv_path is None:
                 logger.warning(f"跳过日期 {date_str}，下载失败")
                 current_date += timedelta(days=1)
                 continue
-            
+
             temp_files.append(csv_path)
             temp_files.append(os.path.dirname(csv_path))  # 临时目录
-            
+
             try:
                 # 导入数据（导入全部数据，不限制百分比）
                 rows_counter = import_data_to_database(
@@ -340,7 +344,7 @@ def collect_binance_by_date(
             except Exception as e:
                 logger.error(f"导入日期 {date_str} 的数据失败: {e}")
                 # 继续处理下一个日期，不中断整个任务
-            
+
             # 清理临时文件
             try:
                 if os.path.exists(csv_path):
@@ -350,21 +354,19 @@ def collect_binance_by_date(
                     os.rmdir(temp_dir)
             except Exception as e:
                 logger.warning(f"清理临时文件失败: {e}")
-            
+
             current_date += timedelta(days=1)
-        
+
         total_time = time.time() - start_time
-        
+
         if check_task(task_id):
             logger.info(f"任务 {task_id} 已取消，停止收集 Binance 数据")
             return 0
-        
-        logger.info(
-            f"成功导入 {total_rows_imported} 行，耗时 {total_time:.2f}s"
-        )
+
+        logger.info(f"成功导入 {total_rows_imported} 行，耗时 {total_time:.2f}s")
         update_task_status(task_id, "SUCCESS")
         return total_rows_imported
-        
+
     except Exception as e:
         logger.error(f"按日期收集 Binance 数据失败: {e}")
         traceback.print_exc(file=sys.stderr)

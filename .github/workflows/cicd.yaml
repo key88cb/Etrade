@@ -16,15 +16,15 @@ jobs:
       with:
         go-version: '1.24'
     
-    #- name: Install and configure PostgreSQL
-    #  run: |
-    #    docker pull postgres
-    #    docker run -d \
-    #    --name postgresql \
-    #    -p 5432:5432 \
-    #    -e POSTGRES_PASSWORD="123456" \
-    #    postgres
-    #    docker ps
+    - name: Install and configure PostgreSQL
+      run: |
+        docker pull postgres
+        docker run -d \
+        --name postgresql \
+        -p 5432:5432 \
+        -e POSTGRES_PASSWORD="123456" \
+        postgres
+        docker ps
 
     - name: Download Go dependencies
       working-directory: ./backend

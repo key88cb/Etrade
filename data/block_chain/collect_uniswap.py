@@ -151,11 +151,11 @@ def collect_uniswap(task_id: str, pool_address: str, start_ts: int, end_ts: int)
             logger.info(f"任务 {task_id} 已取消，停止写入 Uniswap 数据")
             return 0
         rows_counter = process_and_store_uniswap_data(task_id, swaps)
-        update_task_status(task_id, "TASK_STATUS_SUCCESS")
+        update_task_status(task_id, "SUCCESS")
         return rows_counter
     except Exception as e:
         logger.error(f"获取Uniswap数据失败: {e}")
-        update_task_status(task_id, "TASK_STATUS_FAILED")
+        update_task_status(task_id, "FAILED")
         return 0
 
 

@@ -233,7 +233,7 @@ class TestProcessChunk:
                     )
                 # 验证任务状态被更新为失败
                 mock_update_status.assert_called_once_with(
-                    "test_task", "TASK_STATUS_FAILED"
+                    "test_task", "FAILED"
                 )
 
     def test_process_chunk_stops_at_target_rows(self, mock_db_connection):
@@ -407,7 +407,7 @@ class TestImportDataToDatabase:
 
         mock_process_chunk.side_effect = side_effect
 
-        rows_counter = import_data_to_database("test_task", None, None, 100)
+        rows_counter = import_data_to_database("test_task", "test.csv", None, None, 100)
 
         assert len(rows_counter) == 2
         assert rows_counter[0] == 2  # 处理的行数
@@ -454,7 +454,7 @@ class TestImportDataToDatabase:
 
         mock_process_chunk.side_effect = side_effect
 
-        rows_counter = import_data_to_database("test_task", 3, None, 100)
+        rows_counter = import_data_to_database("test_task", "test.csv", 3, None, 100)
 
         assert len(rows_counter) == 2
         # 应该达到目标行数并停止
@@ -473,9 +473,9 @@ class TestImportDataToDatabase:
         mock_read_csv.side_effect = FileNotFoundError("File not found")
 
         with pytest.raises(FileNotFoundError):
-            import_data_to_database("test_task", None, None, 100)
+            import_data_to_database("test_task", "test.csv", None, None, 100)
 
-        mock_update_status.assert_called_once_with("test_task", "TASK_STATUS_FAILED")
+        mock_update_status.assert_called_once_with("test_task", "FAILED")
 
     @patch("block_chain.collect_binance.pd.read_csv")
     @patch("block_chain.collect_binance.update_task_status")
@@ -490,9 +490,9 @@ class TestImportDataToDatabase:
         mock_read_csv.side_effect = Exception("Unexpected error")
 
         with pytest.raises(Exception, match="Unexpected error"):
-            import_data_to_database("test_task", None, None, 100)
+            import_data_to_database("test_task", "test.csv", None, None, 100)
 
-        mock_update_status.assert_called_once_with("test_task", "TASK_STATUS_FAILED")
+        mock_update_status.assert_called_once_with("test_task", "FAILED")
 
     @patch("block_chain.collect_binance.pd.read_csv")
     @patch("block_chain.collect_binance.check_task", return_value=False)
@@ -544,7 +544,7 @@ class TestImportDataToDatabase:
 
         mock_process_chunk.side_effect = side_effect
 
-        rows_counter = import_data_to_database("test_task", None, None, 100)
+        rows_counter = import_data_to_database("test_task", "test.csv", None, None, 100)
 
         assert len(rows_counter) == 2
         assert rows_counter[0] == 4  # 处理了4行
@@ -604,7 +604,7 @@ class TestImportDataToDatabase:
 
         mock_process_chunk.side_effect = side_effect
 
-        rows_counter = import_data_to_database("test_task", 3, None, 100)
+        rows_counter = import_data_to_database("test_task", "test.csv", 3, None, 100)
 
         assert len(rows_counter) == 2
         # 应该只处理第一个chunk就停止（因为达到目标行数3）

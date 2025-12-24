@@ -1,8 +1,8 @@
 db:
-  host: 121.196.205.18
+  host: localhost
   port: 5432
   username: postgres
-  password: etrade2025
+  password: 123456
   database: etrade
 grpc:
   port: ":50060"

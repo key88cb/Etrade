@@ -58,7 +58,7 @@ class TestCheckTask:
         mock_conn.cursor.return_value.__exit__ = lambda *args: None
 
         # Mock返回已取消状态
-        mock_cursor.fetchone.return_value = ("TASK_STATUS_CANCELED",)
+        mock_cursor.fetchone.return_value = ("CANCELLED",)
 
         result = check_task("test_task_1")
 

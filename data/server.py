@@ -152,6 +152,53 @@ class TaskService(TaskServiceServicer):
             status=TaskStatus.TASK_STATUS_RUNNING,
         )
 
+    def CollectBinanceByDate(self, request, context):
+        """
+        按日期收集币安数据
+        在后台线程中执行任务，立即返回运行状态
+        """
+        task_id = request.task_id
+        start_ts = request.start_ts
+        end_ts = request.end_ts
+
+        logger.info(
+            f"收到按日期收集币安数据请求: task_id={task_id}, "
+            f"start_ts={start_ts}, end_ts={end_ts}"
+        )
+
+        def run_task():
+            """在后台线程中执行任务"""
+            try:
+                logger.info(f"开始执行任务 {task_id}: 按日期收集币安数据")
+                mark_task_started(task_id)
+                log_task_event(task_id, "INFO", "开始按日期收集 Binance 数据")
+                collect_binance.collect_binance_by_date(
+                    task_id=task_id,
+                    start_ts=start_ts,
+                    end_ts=end_ts,
+                )
+                logger.info(f"任务 {task_id} 执行成功: 按日期收集币安数据")
+                log_task_event(task_id, "INFO", "按日期收集 Binance 数据完成")
+                mark_task_finished(
+                    task_id,
+                    TaskStatus.TASK_STATUS_SUCCESS,
+                    "Binance 数据按日期收集完成",
+                )
+            except Exception as e:
+                logger.error(f"任务 {task_id} 执行失败: {e}")
+                log_task_event(task_id, "ERROR", f"按日期收集 Binance 数据失败: {e}")
+                mark_task_finished(task_id, TaskStatus.TASK_STATUS_FAILED, str(e))
+
+        # 在后台线程中启动任务
+        thread = threading.Thread(target=run_task, daemon=True)
+        thread.start()
+
+        # 立即返回运行状态
+        return TaskResponse(
+            task_id=task_id,
+            status=TaskStatus.TASK_STATUS_RUNNING,
+        )
+
     def Analyse(self, request, context):
         """
         执行套利分析任务

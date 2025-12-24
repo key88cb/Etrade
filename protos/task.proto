@@ -7,6 +7,8 @@ option go_package = "backend/pkg/taskpb;taskpb";
 service TaskService {
   // 收集币安数据
   rpc CollectBinance(CollectBinanceRequest) returns (TaskResponse);
+  // 按日期收集币安数据
+  rpc CollectBinanceByDate(CollectBinaceByDateRequest) returns (TaskResponse);
   // 收集Uniswap数据
   rpc CollectUniswap(CollectUniswapRequest) returns (TaskResponse);
   // 处理价格数据
@@ -27,6 +29,12 @@ message CollectBinanceRequest {
   string task_id = 1;         // 任务的唯一标识符
   int32 import_percentage = 2; // 导入百分比
   int32 chunk_size = 3;        // 分块大小
+}
+
+message CollectBinaceByDateRequest {
+  string task_id = 1;         // 任务的唯一标识符
+  int32 start_ts = 2;         // 起始时间
+  int32 end_ts = 3;           // 终止时间
 }
 
 message CollectUniswapRequest {

@@ -31,7 +31,7 @@ def check_task(task_id: str):
                 if result is None:
                     logger.error(f"任务 {task_id} 不存在")
                     return True
-                return result[0] == "TASK_STATUS_CANCELED"
+                return result[0] == "CANCELLED"
     except Exception as e:
         logger.error(f"检查任务 {task_id} 失败: {e}")
         return True

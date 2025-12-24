@@ -4,7 +4,7 @@ import warnings
 
 import grpc
 
-from . import task_pb2 as task__pb2
+from protos import task_pb2 as protos_dot_task__pb2
 
 GRPC_GENERATED_VERSION = "1.76.0"
 GRPC_VERSION = grpc.__version__
@@ -22,7 +22,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f"The grpc package installed is at version {GRPC_VERSION},"
-        + " but the generated code in task_pb2_grpc.py depends on"
+        + " but the generated code in protos/task_pb2_grpc.py depends on"
         + f" grpcio>={GRPC_GENERATED_VERSION}."
         + f" Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}"
         + f" or downgrade your generated code using grpcio-tools<={GRPC_VERSION}."
@@ -40,26 +40,32 @@ class TaskServiceStub(object):
         """
         self.CollectBinance = channel.unary_unary(
             "/task.v1.TaskService/CollectBinance",
-            request_serializer=task__pb2.CollectBinanceRequest.SerializeToString,
-            response_deserializer=task__pb2.TaskResponse.FromString,
+            request_serializer=protos_dot_task__pb2.CollectBinanceRequest.SerializeToString,
+            response_deserializer=protos_dot_task__pb2.TaskResponse.FromString,
+            _registered_method=True,
+        )
+        self.CollectBinanceByDate = channel.unary_unary(
+            "/task.v1.TaskService/CollectBinanceByDate",
+            request_serializer=protos_dot_task__pb2.CollectBinaceByDateRequest.SerializeToString,
+            response_deserializer=protos_dot_task__pb2.TaskResponse.FromString,
             _registered_method=True,
         )
         self.CollectUniswap = channel.unary_unary(
             "/task.v1.TaskService/CollectUniswap",
-            request_serializer=task__pb2.CollectUniswapRequest.SerializeToString,
-            response_deserializer=task__pb2.TaskResponse.FromString,
+            request_serializer=protos_dot_task__pb2.CollectUniswapRequest.SerializeToString,
+            response_deserializer=protos_dot_task__pb2.TaskResponse.FromString,
             _registered_method=True,
         )
         self.ProcessPrices = channel.unary_unary(
             "/task.v1.TaskService/ProcessPrices",
-            request_serializer=task__pb2.ProcessPricesRequest.SerializeToString,
-            response_deserializer=task__pb2.TaskResponse.FromString,
+            request_serializer=protos_dot_task__pb2.ProcessPricesRequest.SerializeToString,
+            response_deserializer=protos_dot_task__pb2.TaskResponse.FromString,
             _registered_method=True,
         )
         self.Analyse = channel.unary_unary(
             "/task.v1.TaskService/Analyse",
-            request_serializer=task__pb2.AnalyseRequest.SerializeToString,
-            response_deserializer=task__pb2.TaskResponse.FromString,
+            request_serializer=protos_dot_task__pb2.AnalyseRequest.SerializeToString,
+            response_deserializer=protos_dot_task__pb2.TaskResponse.FromString,
             _registered_method=True,
         )
 
@@ -69,6 +75,12 @@ class TaskServiceServicer(object):
 
     def CollectBinance(self, request, context):
         """收集币安数据"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def CollectBinanceByDate(self, request, context):
+        """按日期收集币安数据"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -96,23 +108,28 @@ def add_TaskServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
         "CollectBinance": grpc.unary_unary_rpc_method_handler(
             servicer.CollectBinance,
-            request_deserializer=task__pb2.CollectBinanceRequest.FromString,
-            response_serializer=task__pb2.TaskResponse.SerializeToString,
+            request_deserializer=protos_dot_task__pb2.CollectBinanceRequest.FromString,
+            response_serializer=protos_dot_task__pb2.TaskResponse.SerializeToString,
+        ),
+        "CollectBinanceByDate": grpc.unary_unary_rpc_method_handler(
+            servicer.CollectBinanceByDate,
+            request_deserializer=protos_dot_task__pb2.CollectBinaceByDateRequest.FromString,
+            response_serializer=protos_dot_task__pb2.TaskResponse.SerializeToString,
         ),
         "CollectUniswap": grpc.unary_unary_rpc_method_handler(
             servicer.CollectUniswap,
-            request_deserializer=task__pb2.CollectUniswapRequest.FromString,
-            response_serializer=task__pb2.TaskResponse.SerializeToString,
+            request_deserializer=protos_dot_task__pb2.CollectUniswapRequest.FromString,
+            response_serializer=protos_dot_task__pb2.TaskResponse.SerializeToString,
         ),
         "ProcessPrices": grpc.unary_unary_rpc_method_handler(
             servicer.ProcessPrices,
-            request_deserializer=task__pb2.ProcessPricesRequest.FromString,
-            response_serializer=task__pb2.TaskResponse.SerializeToString,
+            request_deserializer=protos_dot_task__pb2.ProcessPricesRequest.FromString,
+            response_serializer=protos_dot_task__pb2.TaskResponse.SerializeToString,
         ),
         "Analyse": grpc.unary_unary_rpc_method_handler(
             servicer.Analyse,
-            request_deserializer=task__pb2.AnalyseRequest.FromString,
-            response_serializer=task__pb2.TaskResponse.SerializeToString,
+            request_deserializer=protos_dot_task__pb2.AnalyseRequest.FromString,
+            response_serializer=protos_dot_task__pb2.TaskResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -143,8 +160,38 @@ class TaskService(object):
             request,
             target,
             "/task.v1.TaskService/CollectBinance",
-            task__pb2.CollectBinanceRequest.SerializeToString,
-            task__pb2.TaskResponse.FromString,
+            protos_dot_task__pb2.CollectBinanceRequest.SerializeToString,
+            protos_dot_task__pb2.TaskResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True,
+        )
+
+    @staticmethod
+    def CollectBinanceByDate(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/task.v1.TaskService/CollectBinanceByDate",
+            protos_dot_task__pb2.CollectBinaceByDateRequest.SerializeToString,
+            protos_dot_task__pb2.TaskResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -173,8 +220,8 @@ class TaskService(object):
             request,
             target,
             "/task.v1.TaskService/CollectUniswap",
-            task__pb2.CollectUniswapRequest.SerializeToString,
-            task__pb2.TaskResponse.FromString,
+            protos_dot_task__pb2.CollectUniswapRequest.SerializeToString,
+            protos_dot_task__pb2.TaskResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -203,8 +250,8 @@ class TaskService(object):
             request,
             target,
             "/task.v1.TaskService/ProcessPrices",
-            task__pb2.ProcessPricesRequest.SerializeToString,
-            task__pb2.TaskResponse.FromString,
+            protos_dot_task__pb2.ProcessPricesRequest.SerializeToString,
+            protos_dot_task__pb2.TaskResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -233,8 +280,8 @@ class TaskService(object):
             request,
             target,
             "/task.v1.TaskService/Analyse",
-            task__pb2.AnalyseRequest.SerializeToString,
-            task__pb2.TaskResponse.FromString,
+            protos_dot_task__pb2.AnalyseRequest.SerializeToString,
+            protos_dot_task__pb2.TaskResponse.FromString,
             options,
             channel_credentials,
             insecure,

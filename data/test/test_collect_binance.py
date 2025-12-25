@@ -609,3 +609,566 @@ class TestImportDataToDatabase:
         assert rows_counter[0] >= 3
         # 第二个chunk不应该被处理
         assert mock_process_chunk.call_count == 1
+
+    def test_process_chunk_with_conn_parameter(
+        self, sample_binance_chunk, mock_db_connection
+    ):
+        """
+        测试：使用提供的数据库连接参数
+        """
+        mock_conn, mock_cursor = mock_db_connection
+        rows_counter = [0, 0]
+
+        success, rows_processed, rows_imported, should_stop = process_chunk(
+            "test_task",
+            sample_binance_chunk,
+            0,
+            rows_counter,
+            None,
+            conn=mock_conn,
+        )
+
+        assert success is True
+        assert rows_processed == len(sample_binance_chunk)
+        assert rows_imported == len(sample_binance_chunk)
+        # 验证使用了提供的连接，而不是创建新连接
+        mock_cursor.copy_expert.assert_called_once()
+        # 不应该调用 commit（由调用者控制事务）
+        assert not mock_conn.commit.called
+
+
+class TestCalcTargetRows:
+    """
+    测试计算目标行数函数
+    """
+
+    def test_calc_target_rows_with_percentage(self):
+        """
+        测试：使用百分比计算目标行数
+        """
+        from block_chain.collect_binance import _calc_target_rows
+
+        result = _calc_target_rows(1000, 50)
+        assert result == 500
+
+        result = _calc_target_rows(1000, 100)
+        assert result == 1000
+
+        result = _calc_target_rows(1000, 101)  # 超过100%
+        assert result == 1000
+
+    def test_calc_target_rows_with_none(self):
+        """
+        测试：total_lines为None的情况
+        """
+        from block_chain.collect_binance import _calc_target_rows
+
+        result = _calc_target_rows(None, 50)
+        assert result is None
+
+
+class TestCollectBinance:
+    """
+    测试主收集函数
+    """
+
+    @patch("block_chain.collect_binance.count_lines", return_value=1000)
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    @patch("block_chain.collect_binance.import_data_to_database")
+    @patch("block_chain.collect_binance.psycopg2.connect")
+    @patch("block_chain.collect_binance.update_task_status")
+    def test_collect_binance_success(
+        self,
+        mock_update_status,
+        mock_connect,
+        mock_import_data,
+        mock_check_task,
+        mock_count_lines,
+        mock_db_connection,
+    ):
+        """
+        测试：成功收集数据
+        """
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        mock_import_data.return_value = [1000, 1000]
+
+        from block_chain.collect_binance import collect_binance
+
+        result = collect_binance("test_task", "test.csv", 100, 1000)
+
+        assert result == 1000
+        mock_conn.commit.assert_called_once()
+        mock_update_status.assert_called_once_with("test_task", "SUCCESS")
+
+    @patch("block_chain.collect_binance.count_lines", return_value=1000)
+    @patch("block_chain.collect_binance.check_task")
+    @patch("block_chain.collect_binance.psycopg2.connect")
+    def test_collect_binance_task_cancelled_before_import(
+        self,
+        mock_connect,
+        mock_check_task,
+        mock_count_lines,
+        mock_db_connection,
+    ):
+        """
+        测试：在导入前任务被取消
+        """
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        # 第一次检查返回False，第二次返回True（任务被取消）
+        mock_check_task.side_effect = [False, True]
+
+        from block_chain.collect_binance import collect_binance
+
+        # 需要mock import_data_to_database以避免实际读取文件
+        with patch(
+            "block_chain.collect_binance.import_data_to_database"
+        ) as mock_import:
+            result = collect_binance("test_task", "test.csv", 100, 1000)
+
+            assert result == 0
+            mock_conn.rollback.assert_called_once()
+
+    @patch("block_chain.collect_binance.count_lines", return_value=1000)
+    @patch("block_chain.collect_binance.check_task")
+    @patch("block_chain.collect_binance.import_data_to_database")
+    @patch("block_chain.collect_binance.psycopg2.connect")
+    def test_collect_binance_task_cancelled_after_import(
+        self,
+        mock_connect,
+        mock_import_data,
+        mock_check_task,
+        mock_count_lines,
+        mock_db_connection,
+    ):
+        """
+        测试：在导入后任务被取消
+        """
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        mock_import_data.return_value = [1000, 1000]
+        # 第一次和第二次检查返回False，第三次返回True（任务被取消）
+        # 注意：在collect_binance中，check_task在commit之后再次被调用
+        mock_check_task.side_effect = [False, False, True, True]
+
+        from block_chain.collect_binance import collect_binance
+
+        result = collect_binance("test_task", "test.csv", 100, 1000)
+
+        # 由于在commit之后才检查，所以会返回导入的行数，但不会标记为成功
+        assert result == 1000
+        mock_conn.commit.assert_called_once()
+        # 不会回滚，因为已经在commit之后了
+
+    @patch("block_chain.collect_binance.count_lines", return_value=1000)
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    @patch("block_chain.collect_binance.import_data_to_database")
+    @patch("block_chain.collect_binance.psycopg2.connect")
+    @patch("block_chain.collect_binance.update_task_status")
+    def test_collect_binance_exception_handling(
+        self,
+        mock_update_status,
+        mock_connect,
+        mock_import_data,
+        mock_check_task,
+        mock_count_lines,
+        mock_db_connection,
+    ):
+        """
+        测试：异常处理和回滚
+        """
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        mock_import_data.side_effect = Exception("Database error")
+
+        from block_chain.collect_binance import collect_binance
+
+        with pytest.raises(Exception, match="Database error"):
+            collect_binance("test_task", "test.csv", 100, 1000)
+
+        mock_conn.rollback.assert_called_once()
+        mock_update_status.assert_called_once_with("test_task", "FAILED")
+
+    @patch("block_chain.collect_binance.count_lines", return_value=1000)
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    @patch("block_chain.collect_binance.import_data_to_database")
+    @patch("block_chain.collect_binance.psycopg2.connect")
+    @patch("block_chain.collect_binance.update_task_status")
+    def test_collect_binance_rollback_failure(
+        self,
+        mock_update_status,
+        mock_connect,
+        mock_import_data,
+        mock_check_task,
+        mock_count_lines,
+        mock_db_connection,
+    ):
+        """
+        测试：回滚失败的情况
+        """
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        mock_import_data.side_effect = Exception("Database error")
+        mock_conn.rollback.side_effect = Exception("Rollback failed")
+
+        from block_chain.collect_binance import collect_binance
+
+        with pytest.raises(Exception, match="Database error"):
+            collect_binance("test_task", "test.csv", 100, 1000)
+
+        # 应该尝试回滚，即使回滚失败
+        mock_conn.rollback.assert_called_once()
+        mock_update_status.assert_called_once_with("test_task", "FAILED")
+
+    @patch("block_chain.collect_binance.count_lines", return_value=1000)
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    @patch("block_chain.collect_binance.import_data_to_database")
+    @patch("block_chain.collect_binance.psycopg2.connect")
+    def test_collect_binance_close_connection(
+        self,
+        mock_connect,
+        mock_import_data,
+        mock_check_task,
+        mock_count_lines,
+        mock_db_connection,
+    ):
+        """
+        测试：确保连接被关闭
+        """
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        mock_import_data.return_value = [1000, 1000]
+
+        from block_chain.collect_binance import collect_binance
+
+        collect_binance("test_task", "test.csv", 100, 1000)
+
+        mock_conn.close.assert_called_once()
+
+
+class TestDownloadBinanceFile:
+    """
+    测试下载币安文件函数
+    """
+
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    @patch("block_chain.collect_binance.requests.get")
+    @patch("block_chain.collect_binance.tempfile.mkdtemp")
+    @patch("block_chain.collect_binance.zipfile.ZipFile")
+    @patch("block_chain.collect_binance.os.remove")
+    @patch("block_chain.collect_binance.os.rmdir")
+    @patch("block_chain.collect_binance.os.path.join")
+    @patch("builtins.open", create=True)
+    def test_download_binance_file_success(
+        self,
+        mock_open,
+        mock_join,
+        mock_rmdir,
+        mock_remove,
+        mock_zipfile,
+        mock_mkdtemp,
+        mock_get,
+        mock_check_task,
+    ):
+        """
+        测试：成功下载文件
+        """
+        from block_chain.collect_binance import download_binance_file
+
+        mock_mkdtemp.return_value = "/tmp/test_dir"
+        mock_join.side_effect = lambda *args: "/".join(args)
+        mock_response = MagicMock()
+        mock_response.iter_content.return_value = [b"chunk1", b"chunk2"]
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+
+        mock_file = MagicMock()
+        mock_open.return_value.__enter__ = lambda x: mock_file
+        mock_open.return_value.__exit__ = lambda *args: None
+
+        mock_zip = MagicMock()
+        mock_zip.namelist.return_value = ["ETHUSDT-trades-2025-01-01.csv"]
+        mock_zip.extract = Mock()
+        mock_zipfile.return_value.__enter__ = lambda x: mock_zip
+        mock_zipfile.return_value.__exit__ = lambda *args: None
+
+        result = download_binance_file("test_task", "2025-01-01", "ETHUSDT")
+
+        assert result is not None
+        assert "ETHUSDT-trades-2025-01-01.csv" in result
+
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    @patch("block_chain.collect_binance.requests.get")
+    @patch("block_chain.collect_binance.tempfile.mkdtemp")
+    def test_download_binance_file_request_exception(
+        self, mock_mkdtemp, mock_get, mock_check_task
+    ):
+        """
+        测试：请求异常
+        """
+        import requests
+
+        from block_chain.collect_binance import download_binance_file
+
+        mock_get.side_effect = requests.exceptions.RequestException("Network error")
+
+        result = download_binance_file("test_task", "2025-01-01", "ETHUSDT")
+
+        assert result is None
+
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    @patch("block_chain.collect_binance.requests.get")
+    @patch("block_chain.collect_binance.tempfile.mkdtemp")
+    @patch("block_chain.collect_binance.zipfile.ZipFile")
+    @patch("block_chain.collect_binance.os.remove")
+    @patch("block_chain.collect_binance.os.rmdir")
+    def test_download_binance_file_no_csv_in_zip(
+        self,
+        mock_rmdir,
+        mock_remove,
+        mock_zipfile,
+        mock_mkdtemp,
+        mock_get,
+        mock_check_task,
+    ):
+        """
+        测试：ZIP文件中没有CSV文件
+        """
+        from block_chain.collect_binance import download_binance_file
+
+        mock_mkdtemp.return_value = "/tmp/test_dir"
+        mock_response = MagicMock()
+        mock_response.iter_content.return_value = [b"chunk1"]
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+
+        mock_zip = MagicMock()
+        mock_zip.namelist.return_value = []  # 没有CSV文件
+        mock_zipfile.return_value.__enter__ = lambda x: mock_zip
+        mock_zipfile.return_value.__exit__ = lambda *args: None
+
+        result = download_binance_file("test_task", "2025-01-01", "ETHUSDT")
+
+        assert result is None
+
+    @patch("block_chain.collect_binance.check_task")
+    @patch("block_chain.collect_binance.requests.get")
+    @patch("block_chain.collect_binance.tempfile.mkdtemp")
+    @patch("block_chain.collect_binance.os.remove")
+    @patch("block_chain.collect_binance.os.rmdir")
+    @patch("block_chain.collect_binance.os.path.join")
+    @patch("builtins.open", create=True)
+    def test_download_binance_file_task_cancelled(
+        self,
+        mock_open,
+        mock_join,
+        mock_rmdir,
+        mock_remove,
+        mock_mkdtemp,
+        mock_get,
+        mock_check_task,
+    ):
+        """
+        测试：下载过程中任务被取消
+        """
+        from block_chain.collect_binance import download_binance_file
+
+        mock_mkdtemp.return_value = "/tmp/test_dir"
+        mock_join.side_effect = lambda *args: "/".join(args)
+        mock_response = MagicMock()
+        # 第一次检查返回False，第二次返回True（任务被取消）
+        mock_check_task.side_effect = [False, True]
+        mock_response.iter_content.return_value = [b"chunk1"]
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+
+        mock_file = MagicMock()
+        mock_open.return_value.__enter__ = lambda x: mock_file
+        mock_open.return_value.__exit__ = lambda *args: None
+
+        result = download_binance_file("test_task", "2025-01-01", "ETHUSDT")
+
+        assert result is None
+        # 验证清理操作被调用（可能在异常处理中）
+        # 由于任务取消发生在下载过程中，文件可能还未创建，所以remove可能不会被调用
+
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    @patch("block_chain.collect_binance.requests.get")
+    @patch("block_chain.collect_binance.tempfile.mkdtemp")
+    @patch("block_chain.collect_binance.zipfile.ZipFile")
+    @patch("block_chain.collect_binance.os.remove")
+    @patch("block_chain.collect_binance.os.rmdir")
+    def test_download_binance_file_bad_zip(
+        self,
+        mock_rmdir,
+        mock_remove,
+        mock_zipfile,
+        mock_mkdtemp,
+        mock_get,
+        mock_check_task,
+    ):
+        """
+        测试：ZIP文件损坏
+        """
+        import zipfile
+
+        from block_chain.collect_binance import download_binance_file
+
+        mock_mkdtemp.return_value = "/tmp/test_dir"
+        mock_response = MagicMock()
+        mock_response.iter_content.return_value = [b"chunk1"]
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+
+        mock_zipfile.side_effect = zipfile.BadZipFile("Bad zip file")
+
+        result = download_binance_file("test_task", "2025-01-01", "ETHUSDT")
+
+        assert result is None
+
+
+class TestCollectBinanceByDate:
+    """
+    测试按日期收集币安数据函数
+    """
+
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    @patch("block_chain.collect_binance.download_binance_file")
+    @patch("block_chain.collect_binance.import_data_to_database")
+    @patch("block_chain.collect_binance.psycopg2.connect")
+    @patch("block_chain.collect_binance.update_task_status")
+    @patch("block_chain.collect_binance.os.remove")
+    @patch("block_chain.collect_binance.os.path.exists")
+    @patch("block_chain.collect_binance.os.path.isdir")
+    @patch("block_chain.collect_binance.os.rmdir")
+    def test_collect_binance_by_date_success(
+        self,
+        mock_rmdir,
+        mock_isdir,
+        mock_exists,
+        mock_remove,
+        mock_update_status,
+        mock_connect,
+        mock_import_data,
+        mock_download,
+        mock_check_task,
+        mock_db_connection,
+    ):
+        """
+        测试：成功按日期收集数据
+        """
+        from block_chain.collect_binance import collect_binance_by_date
+
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        mock_download.return_value = "/tmp/test.csv"
+        mock_import_data.return_value = [100, 100]
+        mock_exists.return_value = True
+        mock_isdir.return_value = True
+
+        start_ts = int(pd.Timestamp("2025-01-01", tz="UTC").timestamp())
+        end_ts = int(pd.Timestamp("2025-01-02", tz="UTC").timestamp())
+
+        result = collect_binance_by_date("test_task", start_ts, end_ts, "ETHUSDT", 1000)
+
+        # 处理了两天，每天100行，总共200行
+        assert result == 200
+        mock_conn.commit.assert_called_once()
+        mock_update_status.assert_called_once_with("test_task", "SUCCESS")
+
+    @patch("block_chain.collect_binance.check_task")
+    @patch("block_chain.collect_binance.download_binance_file")
+    @patch("block_chain.collect_binance.import_data_to_database")
+    @patch("block_chain.collect_binance.psycopg2.connect")
+    def test_collect_binance_by_date_task_cancelled(
+        self,
+        mock_connect,
+        mock_import_data,
+        mock_download,
+        mock_check_task,
+        mock_db_connection,
+    ):
+        """
+        测试：任务被取消
+        """
+        from block_chain.collect_binance import collect_binance_by_date
+
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        # 第一次检查返回False，第二次返回True（任务被取消）
+        mock_check_task.side_effect = [False, True]
+
+        start_ts = int(pd.Timestamp("2025-01-01", tz="UTC").timestamp())
+        end_ts = int(pd.Timestamp("2025-01-02", tz="UTC").timestamp())
+
+        result = collect_binance_by_date("test_task", start_ts, end_ts, "ETHUSDT", 1000)
+
+        assert result == 0
+        mock_conn.rollback.assert_called_once()
+
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    @patch("block_chain.collect_binance.download_binance_file")
+    @patch("block_chain.collect_binance.import_data_to_database")
+    @patch("block_chain.collect_binance.psycopg2.connect")
+    @patch("block_chain.collect_binance.update_task_status")
+    def test_collect_binance_by_date_download_fails(
+        self,
+        mock_update_status,
+        mock_connect,
+        mock_import_data,
+        mock_download,
+        mock_check_task,
+        mock_db_connection,
+    ):
+        """
+        测试：下载失败，跳过该日期
+        """
+        from block_chain.collect_binance import collect_binance_by_date
+
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        mock_download.return_value = None  # 下载失败
+
+        start_ts = int(pd.Timestamp("2025-01-01", tz="UTC").timestamp())
+        end_ts = int(pd.Timestamp("2025-01-01", tz="UTC").timestamp())
+
+        result = collect_binance_by_date("test_task", start_ts, end_ts, "ETHUSDT", 1000)
+
+        assert result == 0
+        # 应该提交事务（即使没有数据）
+        mock_conn.commit.assert_called_once()
+
+    @patch("block_chain.collect_binance.check_task", return_value=False)
+    @patch("block_chain.collect_binance.download_binance_file")
+    @patch("block_chain.collect_binance.import_data_to_database")
+    @patch("block_chain.collect_binance.psycopg2.connect")
+    @patch("block_chain.collect_binance.update_task_status")
+    def test_collect_binance_by_date_import_fails(
+        self,
+        mock_update_status,
+        mock_connect,
+        mock_import_data,
+        mock_download,
+        mock_check_task,
+        mock_db_connection,
+    ):
+        """
+        测试：导入失败，回滚事务
+        """
+        from block_chain.collect_binance import collect_binance_by_date
+
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        mock_download.return_value = "/tmp/test.csv"
+        mock_import_data.side_effect = Exception("Import error")
+
+        start_ts = int(pd.Timestamp("2025-01-01", tz="UTC").timestamp())
+        end_ts = int(pd.Timestamp("2025-01-01", tz="UTC").timestamp())
+
+        with pytest.raises(Exception, match="Import error"):
+            collect_binance_by_date("test_task", start_ts, end_ts, "ETHUSDT", 1000)
+
+        # rollback可能被调用多次（一次在异常处理中，一次在finally中）
+        assert mock_conn.rollback.called
+        mock_update_status.assert_called_once_with("test_task", "FAILED")

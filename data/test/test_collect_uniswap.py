@@ -287,3 +287,236 @@ class TestProcessAndStoreUniswapData:
 
         # 应该返回0，不执行数据库操作
         assert result == 0
+
+    @patch("block_chain.collect_uniswap.execute_values")
+    def test_process_and_store_uniswap_data_with_conn(
+        self, mock_execute_values, mock_db_connection
+    ):
+        """
+        测试：使用提供的数据库连接参数
+        """
+        mock_conn, mock_cursor = mock_db_connection
+
+        swaps_data = [
+            {
+                "id": "0x1",
+                "timestamp": "1725187200",
+                "amount0": "1.0",
+                "amount1": "3000.0",
+                "transaction": {"id": "0xtx1", "gasPrice": "50000000000"},
+            },
+        ]
+
+        result = process_and_store_uniswap_data("test_task", swaps_data, conn=mock_conn)
+
+        # 验证execute_values被调用
+        mock_execute_values.assert_called_once()
+        # 验证返回了记录数量
+        assert result == 1
+        # 验证使用了提供的连接（通过检查execute_values的调用）
+        call_args = mock_execute_values.call_args
+        assert call_args is not None
+
+
+class TestCollectUniswap:
+    """
+    测试主收集函数
+    """
+
+    @patch("block_chain.collect_uniswap.fetch_all_swaps")
+    @patch("block_chain.collect_uniswap.check_task", return_value=False)
+    @patch("block_chain.collect_uniswap.process_and_store_uniswap_data")
+    @patch("block_chain.collect_uniswap.psycopg2.connect")
+    @patch("block_chain.collect_uniswap.update_task_status")
+    def test_collect_uniswap_success(
+        self,
+        mock_update_status,
+        mock_connect,
+        mock_process_data,
+        mock_check_task,
+        mock_fetch_swaps,
+        mock_db_connection,
+    ):
+        """
+        测试：成功收集数据
+        """
+        from block_chain.collect_uniswap import collect_uniswap
+
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        mock_fetch_swaps.return_value = [
+            {
+                "id": "0x1",
+                "timestamp": "1725187200",
+                "amount0": "1.0",
+                "amount1": "3000.0",
+                "transaction": {"id": "0xtx1", "gasPrice": "50000000000"},
+            }
+        ]
+        mock_process_data.return_value = 1
+
+        result = collect_uniswap("test_task", "0x123", 1725187200, 1725187260)
+
+        assert result == 1
+        mock_conn.commit.assert_called_once()
+        mock_update_status.assert_called_once_with("test_task", "SUCCESS")
+
+    @patch("block_chain.collect_uniswap.fetch_all_swaps")
+    @patch("block_chain.collect_uniswap.check_task")
+    @patch("block_chain.collect_uniswap.psycopg2.connect")
+    def test_collect_uniswap_task_cancelled_after_fetch(
+        self,
+        mock_connect,
+        mock_check_task,
+        mock_fetch_swaps,
+        mock_db_connection,
+    ):
+        """
+        测试：获取数据后任务被取消
+        """
+        from block_chain.collect_uniswap import collect_uniswap
+
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        mock_fetch_swaps.return_value = [
+            {
+                "id": "0x1",
+                "timestamp": "1725187200",
+                "amount0": "1.0",
+                "amount1": "3000.0",
+                "transaction": {"id": "0xtx1", "gasPrice": "50000000000"},
+            }
+        ]
+        # 第一次检查返回False，第二次返回True（任务被取消）
+        mock_check_task.side_effect = [False, True]
+
+        result = collect_uniswap("test_task", "0x123", 1725187200, 1725187260)
+
+        assert result == 0
+        mock_conn.rollback.assert_called_once()
+
+    @patch("block_chain.collect_uniswap.fetch_all_swaps")
+    @patch("block_chain.collect_uniswap.check_task")
+    @patch("block_chain.collect_uniswap.process_and_store_uniswap_data")
+    @patch("block_chain.collect_uniswap.psycopg2.connect")
+    def test_collect_uniswap_task_cancelled_after_process(
+        self,
+        mock_connect,
+        mock_process_data,
+        mock_check_task,
+        mock_fetch_swaps,
+        mock_db_connection,
+    ):
+        """
+        测试：处理数据后任务被取消
+        """
+        from block_chain.collect_uniswap import collect_uniswap
+
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        mock_fetch_swaps.return_value = [
+            {
+                "id": "0x1",
+                "timestamp": "1725187200",
+                "amount0": "1.0",
+                "amount1": "3000.0",
+                "transaction": {"id": "0xtx1", "gasPrice": "50000000000"},
+            }
+        ]
+        mock_process_data.return_value = 1
+        # 第一次和第二次检查返回False，第三次返回True（任务被取消）
+        # 注意：在collect_uniswap中，check_task在commit之后再次被调用
+        mock_check_task.side_effect = [False, False, True, True]
+
+        result = collect_uniswap("test_task", "0x123", 1725187200, 1725187260)
+
+        # 由于在commit之后才检查，所以会返回导入的行数，但不会标记为成功
+        assert result == 1
+        mock_conn.commit.assert_called_once()
+        # 不会回滚，因为已经在commit之后了
+
+    @patch("block_chain.collect_uniswap.fetch_all_swaps")
+    @patch("block_chain.collect_uniswap.check_task", return_value=False)
+    @patch("block_chain.collect_uniswap.process_and_store_uniswap_data")
+    @patch("block_chain.collect_uniswap.psycopg2.connect")
+    @patch("block_chain.collect_uniswap.update_task_status")
+    def test_collect_uniswap_exception_handling(
+        self,
+        mock_update_status,
+        mock_connect,
+        mock_process_data,
+        mock_check_task,
+        mock_fetch_swaps,
+        mock_db_connection,
+    ):
+        """
+        测试：异常处理和回滚
+        """
+        from block_chain.collect_uniswap import collect_uniswap
+
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        mock_fetch_swaps.side_effect = Exception("Network error")
+
+        result = collect_uniswap("test_task", "0x123", 1725187200, 1725187260)
+
+        assert result == 0
+        mock_conn.rollback.assert_called_once()
+        mock_update_status.assert_called_once_with("test_task", "FAILED")
+
+    @patch("block_chain.collect_uniswap.fetch_all_swaps")
+    @patch("block_chain.collect_uniswap.check_task", return_value=False)
+    @patch("block_chain.collect_uniswap.process_and_store_uniswap_data")
+    @patch("block_chain.collect_uniswap.psycopg2.connect")
+    @patch("block_chain.collect_uniswap.update_task_status")
+    def test_collect_uniswap_rollback_failure(
+        self,
+        mock_update_status,
+        mock_connect,
+        mock_process_data,
+        mock_check_task,
+        mock_fetch_swaps,
+        mock_db_connection,
+    ):
+        """
+        测试：回滚失败的情况
+        """
+        from block_chain.collect_uniswap import collect_uniswap
+
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        mock_fetch_swaps.side_effect = Exception("Network error")
+        mock_conn.rollback.side_effect = Exception("Rollback failed")
+
+        result = collect_uniswap("test_task", "0x123", 1725187200, 1725187260)
+
+        assert result == 0
+        # 应该尝试回滚，即使回滚失败
+        mock_conn.rollback.assert_called_once()
+        mock_update_status.assert_called_once_with("test_task", "FAILED")
+
+    @patch("block_chain.collect_uniswap.fetch_all_swaps")
+    @patch("block_chain.collect_uniswap.check_task", return_value=False)
+    @patch("block_chain.collect_uniswap.process_and_store_uniswap_data")
+    @patch("block_chain.collect_uniswap.psycopg2.connect")
+    def test_collect_uniswap_close_connection(
+        self,
+        mock_connect,
+        mock_process_data,
+        mock_check_task,
+        mock_fetch_swaps,
+        mock_db_connection,
+    ):
+        """
+        测试：确保连接被关闭
+        """
+        from block_chain.collect_uniswap import collect_uniswap
+
+        mock_conn, mock_cursor = mock_db_connection
+        mock_connect.return_value = mock_conn
+        mock_fetch_swaps.return_value = []
+        mock_process_data.return_value = 0
+
+        collect_uniswap("test_task", "0x123", 1725187200, 1725187260)
+
+        mock_conn.close.assert_called_once()

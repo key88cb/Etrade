@@ -199,51 +199,6 @@ class TaskService(TaskServiceServicer):
             status=TaskStatus.TASK_STATUS_RUNNING,
         )
 
-    def Analyse(self, request, context):
-        """
-        执行套利分析任务
-        """
-        task_id = request.task_id
-        batch_id = request.batch_id
-        overwrite = request.overwrite
-        strategy_json = request.strategy_json
-
-        logger.info(
-            "收到套利分析请求: task_id=%s batch_id=%s overwrite=%s",
-            task_id,
-            batch_id,
-            overwrite,
-        )
-
-        def run_task():
-            try:
-                mark_task_started(task_id)
-                log_task_event(task_id, "INFO", "套利分析开始执行")
-                config = {
-                    "batch_id": batch_id,
-                    "overwrite": overwrite,
-                }
-                if strategy_json:
-                    try:
-                        config["strategy"] = json.loads(strategy_json)
-                    except json.JSONDecodeError as exc:
-                        logger.warning("解析 strategy_json 失败: %s", exc)
-                analyse.run_analyse(task_id=task_id, config_json=json.dumps(config))
-                logger.info("套利分析任务 %s 执行成功", task_id)
-                log_task_event(task_id, "INFO", "套利分析完成")
-                mark_task_finished(
-                    task_id, TaskStatus.TASK_STATUS_SUCCESS, "套利分析完成"
-                )
-            except Exception as exc:
-                logger.error("套利分析任务 %s 执行失败: %s", task_id, exc)
-                log_task_event(task_id, "ERROR", f"套利分析失败: {exc}")
-                mark_task_finished(task_id, TaskStatus.TASK_STATUS_FAILED, str(exc))
-
-        thread = threading.Thread(target=run_task, daemon=True)
-        thread.start()
-
-        return TaskResponse(task_id=task_id, status=TaskStatus.TASK_STATUS_RUNNING)
-
     def CollectUniswap(self, request, context):
         """
         收集 Uniswap 数据
@@ -398,8 +353,6 @@ class TaskService(TaskServiceServicer):
                 kwargs["overwrite"] = (
                     overwrite  # overwrite=True 时重建表，overwrite=False 时追加数据
                 )
-
-                analyse.run_analyse(task_id=task_id, config_json=json.dumps(kwargs))
 
                 analyse.run_analyse(task_id=task_id, config_json=json.dumps(kwargs))
                 logger.info(f"任务 {task_id} 执行成功: 分析数据")

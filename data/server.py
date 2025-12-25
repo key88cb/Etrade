@@ -204,7 +204,9 @@ class RabbitMQManager:
                         delivery_mode=2,  # 使消息持久化
                     ),
                 )
-                logger.info(f"任务已入队: task_type={task_type}, task_id={task_data.get('task_id')}")
+                logger.info(
+                    f"任务已入队: task_type={task_type}, task_id={task_data.get('task_id')}"
+                )
             except Exception as e:
                 logger.error(f"发布任务到队列失败: {e}")
                 # 尝试重新连接
@@ -217,7 +219,9 @@ class RabbitMQManager:
                         body=json.dumps(message),
                         properties=pika.BasicProperties(delivery_mode=2),
                     )
-                    logger.info(f"任务已入队（重试成功）: task_type={task_type}, task_id={task_data.get('task_id')}")
+                    logger.info(
+                        f"任务已入队（重试成功）: task_type={task_type}, task_id={task_data.get('task_id')}"
+                    )
                 except Exception as retry_err:
                     logger.error(f"发布任务重试失败: {retry_err}")
                     raise
@@ -251,7 +255,9 @@ def execute_task(task_type: str, task_data: dict):
         log_task_event(task_id, "INFO", f"开始执行任务: {task_type}")
 
         if task_type == "collect_binance":
-            csv_path = os.path.join(os.path.dirname(__file__), "ETHUSDT-trades-2025-09.csv")
+            csv_path = os.path.join(
+                os.path.dirname(__file__), "ETHUSDT-trades-2025-09.csv"
+            )
             collect_binance.collect_binance(
                 task_id=task_id,
                 csv_path=csv_path,
@@ -343,6 +349,7 @@ def execute_task(task_type: str, task_data: dict):
 
 def consume_tasks():
     """从队列中消费任务并并发执行（支持5个任务并发）"""
+
     def callback(ch, method, properties, body):
         try:
             message = json.loads(body)
@@ -358,10 +365,10 @@ def consume_tasks():
             # 注意：我们在任务提交到线程池后立即确认消息
             # 因为任务状态已经在数据库中记录，即使任务失败也不应该重复处理
             task_executor.submit(execute_task, task_type, task_data)
-            
+
             # 立即确认消息（任务已提交到线程池，状态会在数据库中记录）
             ch.basic_ack(delivery_tag=method.delivery_tag)
-            
+
         except Exception as e:
             logger.error(f"处理队列消息失败: {e}")
             # 发生异常时立即确认消息，避免重复处理
@@ -377,7 +384,7 @@ def consume_tasks():
         try:
             # 创建独立的消费连接（与发布连接分离，保证线程安全）
             connection, channel = rabbitmq_manager.connect_consume()
-            
+
             # 设置 QoS，每个消费者可以预取5个任务，支持并发执行
             channel.basic_qos(prefetch_count=5)
             # 开始消费

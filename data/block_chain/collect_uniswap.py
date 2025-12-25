@@ -186,7 +186,7 @@ def collect_uniswap(task_id: str, pool_address: str, start_ts: int, end_ts: int)
             return 0
 
         rows_counter = process_and_store_uniswap_data(task_id, swaps, conn)
-        
+
         if check_task(task_id):
             logger.info(f"任务 {task_id} 已取消，回滚所有已导入的数据")
             conn.rollback()

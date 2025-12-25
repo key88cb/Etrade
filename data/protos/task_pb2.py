@@ -9,47 +9,43 @@ from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
+
 _runtime_version.ValidateProtobufRuntimeVersion(
-    _runtime_version.Domain.PUBLIC,
-    6,
-    31,
-    1,
-    '',
-    'protos/task.proto'
+    _runtime_version.Domain.PUBLIC, 6, 31, 1, "", "protos/task.proto"
 )
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
 
 
-
-
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11protos/task.proto\x12\x07task.v1\"W\n\x15\x43ollectBinanceRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x19\n\x11import_percentage\x18\x02 \x01(\x05\x12\x12\n\nchunk_size\x18\x03 \x01(\x05\"P\n\x1b\x43ollectBinanceByDateRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x10\n\x08start_ts\x18\x02 \x01(\x05\x12\x0e\n\x06\x65nd_ts\x18\x03 \x01(\x05\"`\n\x15\x43ollectUniswapRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x14\n\x0cpool_address\x18\x02 \x01(\t\x12\x10\n\x08start_ts\x18\x03 \x01(\x05\x12\x0e\n\x06\x65nd_ts\x18\x04 \x01(\x05\"\xf8\x01\n\x14ProcessPricesRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x12\n\nstart_date\x18\x02 \x01(\x05\x12\x10\n\x08\x65nd_date\x18\x03 \x01(\x05\x12\x1c\n\x14\x61ggregation_interval\x18\x04 \x01(\t\x12\x11\n\toverwrite\x18\x05 \x01(\x08\x12\x44\n\x0c\x64\x62_overrides\x18\x06 \x03(\x0b\x32..task.v1.ProcessPricesRequest.DbOverridesEntry\x1a\x32\n\x10\x44\x62OverridesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"]\n\x0e\x41nalyseRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x10\n\x08\x62\x61tch_id\x18\x02 \x01(\x05\x12\x11\n\toverwrite\x18\x03 \x01(\x08\x12\x15\n\rstrategy_json\x18\x04 \x01(\t\"D\n\x0cTaskResponse\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12#\n\x06status\x18\x02 \x01(\x0e\x32\x13.task.v1.TaskStatus*K\n\nTaskStatus\x12\x08\n\x04WAIT\x10\x00\x12\x0b\n\x07RUNNING\x10\x01\x12\x0b\n\x07SUCCESS\x10\x02\x12\n\n\x06\x46\x41ILED\x10\x03\x12\r\n\tCANCELLED\x10\x04\x32\xf6\x02\n\x0bTaskService\x12G\n\x0e\x43ollectBinance\x12\x1e.task.v1.CollectBinanceRequest\x1a\x15.task.v1.TaskResponse\x12S\n\x14\x43ollectBinanceByDate\x12$.task.v1.CollectBinanceByDateRequest\x1a\x15.task.v1.TaskResponse\x12G\n\x0e\x43ollectUniswap\x12\x1e.task.v1.CollectUniswapRequest\x1a\x15.task.v1.TaskResponse\x12\x45\n\rProcessPrices\x12\x1d.task.v1.ProcessPricesRequest\x1a\x15.task.v1.TaskResponse\x12\x39\n\x07\x41nalyse\x12\x17.task.v1.AnalyseRequest\x1a\x15.task.v1.TaskResponseB\x1bZ\x19\x62\x61\x63kend/pkg/taskpb;taskpbb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
+    b'\n\x11protos/task.proto\x12\x07task.v1"W\n\x15\x43ollectBinanceRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x19\n\x11import_percentage\x18\x02 \x01(\x05\x12\x12\n\nchunk_size\x18\x03 \x01(\x05"P\n\x1b\x43ollectBinanceByDateRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x10\n\x08start_ts\x18\x02 \x01(\x05\x12\x0e\n\x06\x65nd_ts\x18\x03 \x01(\x05"`\n\x15\x43ollectUniswapRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x14\n\x0cpool_address\x18\x02 \x01(\t\x12\x10\n\x08start_ts\x18\x03 \x01(\x05\x12\x0e\n\x06\x65nd_ts\x18\x04 \x01(\x05"\xf8\x01\n\x14ProcessPricesRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x12\n\nstart_date\x18\x02 \x01(\x05\x12\x10\n\x08\x65nd_date\x18\x03 \x01(\x05\x12\x1c\n\x14\x61ggregation_interval\x18\x04 \x01(\t\x12\x11\n\toverwrite\x18\x05 \x01(\x08\x12\x44\n\x0c\x64\x62_overrides\x18\x06 \x03(\x0b\x32..task.v1.ProcessPricesRequest.DbOverridesEntry\x1a\x32\n\x10\x44\x62OverridesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"]\n\x0e\x41nalyseRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x10\n\x08\x62\x61tch_id\x18\x02 \x01(\x05\x12\x11\n\toverwrite\x18\x03 \x01(\x08\x12\x15\n\rstrategy_json\x18\x04 \x01(\t"D\n\x0cTaskResponse\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12#\n\x06status\x18\x02 \x01(\x0e\x32\x13.task.v1.TaskStatus*K\n\nTaskStatus\x12\x08\n\x04WAIT\x10\x00\x12\x0b\n\x07RUNNING\x10\x01\x12\x0b\n\x07SUCCESS\x10\x02\x12\n\n\x06\x46\x41ILED\x10\x03\x12\r\n\tCANCELLED\x10\x04\x32\xf6\x02\n\x0bTaskService\x12G\n\x0e\x43ollectBinance\x12\x1e.task.v1.CollectBinanceRequest\x1a\x15.task.v1.TaskResponse\x12S\n\x14\x43ollectBinanceByDate\x12$.task.v1.CollectBinanceByDateRequest\x1a\x15.task.v1.TaskResponse\x12G\n\x0e\x43ollectUniswap\x12\x1e.task.v1.CollectUniswapRequest\x1a\x15.task.v1.TaskResponse\x12\x45\n\rProcessPrices\x12\x1d.task.v1.ProcessPricesRequest\x1a\x15.task.v1.TaskResponse\x12\x39\n\x07\x41nalyse\x12\x17.task.v1.AnalyseRequest\x1a\x15.task.v1.TaskResponseB\x1bZ\x19\x62\x61\x63kend/pkg/taskpb;taskpbb\x06proto3'
+)
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
-_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'protos.task_pb2', _globals)
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, "protos.task_pb2", _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
-  _globals['DESCRIPTOR']._loaded_options = None
-  _globals['DESCRIPTOR']._serialized_options = b'Z\031backend/pkg/taskpb;taskpb'
-  _globals['_PROCESSPRICESREQUEST_DBOVERRIDESENTRY']._loaded_options = None
-  _globals['_PROCESSPRICESREQUEST_DBOVERRIDESENTRY']._serialized_options = b'8\001'
-  _globals['_TASKSTATUS']._serialized_start=715
-  _globals['_TASKSTATUS']._serialized_end=790
-  _globals['_COLLECTBINANCEREQUEST']._serialized_start=30
-  _globals['_COLLECTBINANCEREQUEST']._serialized_end=117
-  _globals['_COLLECTBINANCEBYDATEREQUEST']._serialized_start=119
-  _globals['_COLLECTBINANCEBYDATEREQUEST']._serialized_end=199
-  _globals['_COLLECTUNISWAPREQUEST']._serialized_start=201
-  _globals['_COLLECTUNISWAPREQUEST']._serialized_end=297
-  _globals['_PROCESSPRICESREQUEST']._serialized_start=300
-  _globals['_PROCESSPRICESREQUEST']._serialized_end=548
-  _globals['_PROCESSPRICESREQUEST_DBOVERRIDESENTRY']._serialized_start=498
-  _globals['_PROCESSPRICESREQUEST_DBOVERRIDESENTRY']._serialized_end=548
-  _globals['_ANALYSEREQUEST']._serialized_start=550
-  _globals['_ANALYSEREQUEST']._serialized_end=643
-  _globals['_TASKRESPONSE']._serialized_start=645
-  _globals['_TASKRESPONSE']._serialized_end=713
-  _globals['_TASKSERVICE']._serialized_start=793
-  _globals['_TASKSERVICE']._serialized_end=1167
+    _globals["DESCRIPTOR"]._loaded_options = None
+    _globals["DESCRIPTOR"]._serialized_options = b"Z\031backend/pkg/taskpb;taskpb"
+    _globals["_PROCESSPRICESREQUEST_DBOVERRIDESENTRY"]._loaded_options = None
+    _globals["_PROCESSPRICESREQUEST_DBOVERRIDESENTRY"]._serialized_options = b"8\001"
+    _globals["_TASKSTATUS"]._serialized_start = 715
+    _globals["_TASKSTATUS"]._serialized_end = 790
+    _globals["_COLLECTBINANCEREQUEST"]._serialized_start = 30
+    _globals["_COLLECTBINANCEREQUEST"]._serialized_end = 117
+    _globals["_COLLECTBINANCEBYDATEREQUEST"]._serialized_start = 119
+    _globals["_COLLECTBINANCEBYDATEREQUEST"]._serialized_end = 199
+    _globals["_COLLECTUNISWAPREQUEST"]._serialized_start = 201
+    _globals["_COLLECTUNISWAPREQUEST"]._serialized_end = 297
+    _globals["_PROCESSPRICESREQUEST"]._serialized_start = 300
+    _globals["_PROCESSPRICESREQUEST"]._serialized_end = 548
+    _globals["_PROCESSPRICESREQUEST_DBOVERRIDESENTRY"]._serialized_start = 498
+    _globals["_PROCESSPRICESREQUEST_DBOVERRIDESENTRY"]._serialized_end = 548
+    _globals["_ANALYSEREQUEST"]._serialized_start = 550
+    _globals["_ANALYSEREQUEST"]._serialized_end = 643
+    _globals["_TASKRESPONSE"]._serialized_start = 645
+    _globals["_TASKRESPONSE"]._serialized_end = 713
+    _globals["_TASKSERVICE"]._serialized_start = 793
+    _globals["_TASKSERVICE"]._serialized_end = 1167
 # @@protoc_insertion_point(module_scope)

@@ -206,27 +206,71 @@ def _calc_target_rows(
 def collect_binance(
     task_id: str, csv_path: str, import_percentage: int, chunk_size: int
 ):
+    """
+    描述：收集 Binance 数据（作为事务处理，如果任务取消则完全回滚）
+    参数：
+        task_id: 任务ID
+        csv_path: CSV文件路径
+        import_percentage: 导入百分比
+        chunk_size: 分块大小
+    返回值：导入的总行数
+    """
+    conn = None
     try:
         start_time = time.time()
         total_lines = count_lines(task_id, csv_path)
         if check_task(task_id):
             logger.info(f"任务 {task_id} 已取消，停止导入 Binance 数据")
             return 0
+
+        # 创建数据库连接并开始事务
+        conn = psycopg2.connect(
+            host=db_config["host"],
+            port=db_config["port"],
+            dbname=db_config["database"],
+            user=db_config["username"],
+            password=db_config["password"],
+        )
+        conn.autocommit = False  # 禁用自动提交，使用事务
+        logger.info("已开启数据库事务，所有导入操作将在事务中执行")
+
         target_rows = _calc_target_rows(total_lines, import_percentage)
         rows_counter = import_data_to_database(
-            task_id, csv_path, target_rows, total_lines, chunk_size
+            task_id, csv_path, target_rows, total_lines, chunk_size, conn
         )
         total_time = time.time() - start_time
+
         if check_task(task_id):
-            logger.info(f"任务 {task_id} 已取消，停止导入 Binance 数据")
+            logger.info(f"任务 {task_id} 已取消，回滚所有已导入的数据")
+            conn.rollback()
+            logger.info("已回滚所有数据")
             return 0
+
+        # 所有数据导入成功，提交事务
+        conn.commit()
+        logger.info("事务已提交，所有数据已成功导入")
         logger.info(f"成功导入 {rows_counter[1]} 行，耗时 {total_time:.2f}s")
         update_task_status(task_id, "SUCCESS")
         return rows_counter[1]
     except Exception as e:
         logger.error(f"导入 Binance 数据失败: {e}")
+        traceback.print_exc(file=sys.stderr)
+        # 确保在异常情况下回滚事务
+        if conn is not None:
+            try:
+                conn.rollback()
+                logger.info("发生异常，已回滚所有数据")
+            except Exception as rollback_error:
+                logger.error(f"回滚事务失败: {rollback_error}")
         update_task_status(task_id, "FAILED")
         raise
+    finally:
+        # 确保关闭数据库连接
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception as close_error:
+                logger.warning(f"关闭数据库连接失败: {close_error}")
 
 
 def download_binance_file(

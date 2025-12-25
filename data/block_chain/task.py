@@ -51,6 +51,7 @@ def update_task_status(task_id: str, status: str):
                     "UPDATE tasks SET status = %s WHERE task_id = %s",
                     (status, str(task_id)),
                 )
+                conn.commit()
     except Exception as e:
         logger.error(f"更新任务 {task_id} 状态失败: {e}")
 

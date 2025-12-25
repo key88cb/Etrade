@@ -11,6 +11,7 @@ import yaml
 from loguru import logger
 
 from block_chain import analyse, collect_binance, collect_uniswap, process_prices
+from block_chain.task import check_task
 
 # 导入生成的代码
 from protos.task_pb2 import TaskResponse, TaskStatus
@@ -132,11 +133,19 @@ class TaskService(TaskServiceServicer):
                     import_percentage=import_percentage,
                     chunk_size=chunk_size,
                 )
-                logger.info(f"任务 {task_id} 执行成功: 收集币安数据")
-                log_task_event(task_id, "INFO", "收集 Binance 数据完成")
-                mark_task_finished(
-                    task_id, TaskStatus.TASK_STATUS_SUCCESS, "Binance 数据导入完成"
-                )
+                # 检查任务是否被取消
+                if check_task(task_id):
+                    logger.info(f"任务 {task_id} 已被取消，不标记为成功")
+                    log_task_event(task_id, "INFO", "任务被取消")
+                    mark_task_finished(
+                        task_id, TaskStatus.TASK_STATUS_CANCELED, "任务被取消"
+                    )
+                else:
+                    logger.info(f"任务 {task_id} 执行成功: 收集币安数据")
+                    log_task_event(task_id, "INFO", "收集 Binance 数据完成")
+                    mark_task_finished(
+                        task_id, TaskStatus.TASK_STATUS_SUCCESS, "Binance 数据导入完成"
+                    )
             except Exception as e:
                 logger.error(f"任务 {task_id} 执行失败: {e}")
                 log_task_event(task_id, "ERROR", f"收集 Binance 数据失败: {e}")
@@ -177,13 +186,21 @@ class TaskService(TaskServiceServicer):
                     start_ts=start_ts,
                     end_ts=end_ts,
                 )
-                logger.info(f"任务 {task_id} 执行成功: 按日期收集币安数据")
-                log_task_event(task_id, "INFO", "按日期收集 Binance 数据完成")
-                mark_task_finished(
-                    task_id,
-                    TaskStatus.TASK_STATUS_SUCCESS,
-                    "Binance 数据按日期收集完成",
-                )
+                # 检查任务是否被取消
+                if check_task(task_id):
+                    logger.info(f"任务 {task_id} 已被取消，不标记为成功")
+                    log_task_event(task_id, "INFO", "任务被取消")
+                    mark_task_finished(
+                        task_id, TaskStatus.TASK_STATUS_CANCELED, "任务被取消"
+                    )
+                else:
+                    logger.info(f"任务 {task_id} 执行成功: 按日期收集币安数据")
+                    log_task_event(task_id, "INFO", "按日期收集 Binance 数据完成")
+                    mark_task_finished(
+                        task_id,
+                        TaskStatus.TASK_STATUS_SUCCESS,
+                        "Binance 数据按日期收集完成",
+                    )
             except Exception as e:
                 logger.error(f"任务 {task_id} 执行失败: {e}")
                 log_task_event(task_id, "ERROR", f"按日期收集 Binance 数据失败: {e}")
@@ -226,11 +243,19 @@ class TaskService(TaskServiceServicer):
                     start_ts=start_ts,
                     end_ts=end_ts,
                 )
-                logger.info(f"任务 {task_id} 执行成功: 收集 Uniswap 数据")
-                log_task_event(task_id, "INFO", "收集 Uniswap 数据完成")
-                mark_task_finished(
-                    task_id, TaskStatus.TASK_STATUS_SUCCESS, "Uniswap 数据采集完成"
-                )
+                # 检查任务是否被取消
+                if check_task(task_id):
+                    logger.info(f"任务 {task_id} 已被取消，不标记为成功")
+                    log_task_event(task_id, "INFO", "任务被取消")
+                    mark_task_finished(
+                        task_id, TaskStatus.TASK_STATUS_CANCELED, "任务被取消"
+                    )
+                else:
+                    logger.info(f"任务 {task_id} 执行成功: 收集 Uniswap 数据")
+                    log_task_event(task_id, "INFO", "收集 Uniswap 数据完成")
+                    mark_task_finished(
+                        task_id, TaskStatus.TASK_STATUS_SUCCESS, "Uniswap 数据采集完成"
+                    )
             except Exception as e:
                 logger.error(f"任务 {task_id} 执行失败: {e}")
                 log_task_event(task_id, "ERROR", f"收集 Uniswap 数据失败: {e}")
@@ -301,7 +326,19 @@ class TaskService(TaskServiceServicer):
                     kwargs.update(db_overrides)
 
                 process_prices.run_process_prices(task_id=task_id, **kwargs)
-                logger.info(f"任务 {task_id} 执行成功: 处理价格数据")
+                # 检查任务是否被取消
+                if check_task(task_id):
+                    logger.info(f"任务 {task_id} 已被取消，不标记为成功")
+                    log_task_event(task_id, "INFO", "任务被取消")
+                    mark_task_finished(
+                        task_id, TaskStatus.TASK_STATUS_CANCELED, "任务被取消"
+                    )
+                else:
+                    logger.info(f"任务 {task_id} 执行成功: 处理价格数据")
+                    log_task_event(task_id, "INFO", "处理价格数据完成")
+                    mark_task_finished(
+                        task_id, TaskStatus.TASK_STATUS_SUCCESS, "价格数据处理完成"
+                    )
             except Exception as e:
                 logger.error(f"任务 {task_id} 执行失败: {e}")
 
@@ -355,9 +392,23 @@ class TaskService(TaskServiceServicer):
                 )
 
                 analyse.run_analyse(task_id=task_id, config_json=json.dumps(kwargs))
-                logger.info(f"任务 {task_id} 执行成功: 分析数据")
+                # 检查任务是否被取消
+                if check_task(task_id):
+                    logger.info(f"任务 {task_id} 已被取消，不标记为成功")
+                    log_task_event(task_id, "INFO", "任务被取消")
+                    mark_task_finished(
+                        task_id, TaskStatus.TASK_STATUS_CANCELED, "任务被取消"
+                    )
+                else:
+                    logger.info(f"任务 {task_id} 执行成功: 分析数据")
+                    log_task_event(task_id, "INFO", "分析数据完成")
+                    mark_task_finished(
+                        task_id, TaskStatus.TASK_STATUS_SUCCESS, "数据分析完成"
+                    )
             except Exception as e:
                 logger.error(f"任务 {task_id} 执行失败: {e}")
+                log_task_event(task_id, "ERROR", f"分析数据失败: {e}")
+                mark_task_finished(task_id, TaskStatus.TASK_STATUS_FAILED, str(e))
 
         # 在后台线程中启动任务
         thread = threading.Thread(target=run_task, daemon=True)

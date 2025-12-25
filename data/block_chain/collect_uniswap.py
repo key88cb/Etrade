@@ -196,7 +196,11 @@ def collect_uniswap(task_id: str, pool_address: str, start_ts: int, end_ts: int)
         # 所有数据导入成功，提交事务
         conn.commit()
         logger.info("事务已提交，所有数据已成功导入")
-        update_task_status(task_id, "SUCCESS")
+        # 在标记成功前，再次检查任务是否被取消
+        if check_task(task_id):
+            logger.info(f"任务 {task_id} 已取消，不标记为成功")
+        else:
+            update_task_status(task_id, "SUCCESS")
         return rows_counter
     except Exception as e:
         logger.error(f"获取Uniswap数据失败: {e}")

@@ -249,7 +249,11 @@ def collect_binance(
         conn.commit()
         logger.info("事务已提交，所有数据已成功导入")
         logger.info(f"成功导入 {rows_counter[1]} 行，耗时 {total_time:.2f}s")
-        update_task_status(task_id, "SUCCESS")
+        # 在标记成功前，再次检查任务是否被取消
+        if check_task(task_id):
+            logger.info(f"任务 {task_id} 已取消，不标记为成功")
+        else:
+            update_task_status(task_id, "SUCCESS")
         return rows_counter[1]
     except Exception as e:
         logger.error(f"导入 Binance 数据失败: {e}")
@@ -441,7 +445,11 @@ def collect_binance_by_date(
         logger.info("事务已提交，所有数据已成功导入")
 
         logger.info(f"成功导入 {total_rows_imported} 行，耗时 {total_time:.2f}s")
-        update_task_status(task_id, "SUCCESS")
+        # 在标记成功前，再次检查任务是否被取消
+        if check_task(task_id):
+            logger.info(f"任务 {task_id} 已取消，不标记为成功")
+        else:
+            update_task_status(task_id, "SUCCESS")
         return total_rows_imported
 
     except Exception as e:

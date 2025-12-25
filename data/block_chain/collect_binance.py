@@ -8,7 +8,7 @@ import time
 import traceback
 import zipfile
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Any
+from typing import Any, Optional
 
 import pandas as pd
 import psycopg2
@@ -106,7 +106,7 @@ def process_chunk(
         csv_buffer.seek(0)
         columns = "id, price, qty, quote_qty, trade_time, is_buyer_maker, is_best_match"
         copy_sql = f"COPY binance_trades ({columns}) FROM STDIN WITH (FORMAT CSV)"
-        
+
         # 如果提供了连接，使用它；否则创建新连接
         if conn is not None:
             with conn.cursor() as cursor:

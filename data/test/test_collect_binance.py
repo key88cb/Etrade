@@ -232,9 +232,7 @@ class TestProcessChunk:
                         None,
                     )
                 # 验证任务状态被更新为失败
-                mock_update_status.assert_called_once_with(
-                    "test_task", "FAILED"
-                )
+                mock_update_status.assert_called_once_with("test_task", "FAILED")
 
     def test_process_chunk_stops_at_target_rows(self, mock_db_connection):
         """

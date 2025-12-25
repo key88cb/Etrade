@@ -46,7 +46,7 @@ class TaskServiceStub(object):
         )
         self.CollectBinanceByDate = channel.unary_unary(
             "/task.v1.TaskService/CollectBinanceByDate",
-            request_serializer=protos_dot_task__pb2.CollectBinaceByDateRequest.SerializeToString,
+            request_serializer=protos_dot_task__pb2.CollectBinanceByDateRequest.SerializeToString,
             response_deserializer=protos_dot_task__pb2.TaskResponse.FromString,
             _registered_method=True,
         )
@@ -113,7 +113,7 @@ def add_TaskServiceServicer_to_server(servicer, server):
         ),
         "CollectBinanceByDate": grpc.unary_unary_rpc_method_handler(
             servicer.CollectBinanceByDate,
-            request_deserializer=protos_dot_task__pb2.CollectBinaceByDateRequest.FromString,
+            request_deserializer=protos_dot_task__pb2.CollectBinanceByDateRequest.FromString,
             response_serializer=protos_dot_task__pb2.TaskResponse.SerializeToString,
         ),
         "CollectUniswap": grpc.unary_unary_rpc_method_handler(
@@ -190,7 +190,7 @@ class TaskService(object):
             request,
             target,
             "/task.v1.TaskService/CollectBinanceByDate",
-            protos_dot_task__pb2.CollectBinaceByDateRequest.SerializeToString,
+            protos_dot_task__pb2.CollectBinanceByDateRequest.SerializeToString,
             protos_dot_task__pb2.TaskResponse.FromString,
             options,
             channel_credentials,

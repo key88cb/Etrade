@@ -367,7 +367,11 @@ def run_analyse(task_id: Optional[str] = None, config_json: Optional[str] = None
         raise
     else:
         logger.info(f"分析完成，发现 {len(opportunities)} 条机会")
-        update_task_status(task_id, 1)
+        # 在标记成功前，再次检查任务是否被取消
+        if check_task(task_id):
+            logger.info(f"任务 {task_id} 已取消，不标记为成功")
+        else:
+            update_task_status(task_id, 1)
         conn.close()
 
 

@@ -12,11 +12,13 @@
 
 Etrade 是一个用于 CEX-DEX 套利分析的一站式平台，主要针对 Uniswap V3 和 Binance 的 ETH/USDT 交易对进行分析。
 
-当前版本的核心数据流/调用链路如下：
+系统采用微服务架构，核心数据流如下：
 
-`[Vue.js 前端 (浏览器)] -> [Go 后端 API (Gin)] -> [Python Worker (gRPC，采集/分析)] -> [PostgreSQL 数据库]`
+`[Vue.js 前端] -> [Go 后端 API (Gin)] -> [Python Worker (gRPC)] -> [PostgreSQL 数据库]`
 
-其中：Go 端负责任务创建/调度与对外 API；Python 端作为 Worker 执行具体脚本（采集/聚合/分析）并写入任务日志与结果。
+架构说明：
+- **Go 后端**：负责任务创建、调度与对外 API 服务
+- **Python Worker**：执行数据采集、聚合、分析等具体任务，并写入任务日志与结果
 
 ![](images/architecture.png)
 
@@ -39,43 +41,45 @@ npm install # 下载对应依赖
 npm run dev # 运行项目
 ```
 
-前端默认请求后端 `http://localhost:8888/api/v1`（如需修改请使用前端环境变量配置）。
+前端默认请求后端 `http://localhost:8888/api/v1`
 
-前端项目结构，主要是 src 目录：
+**项目结构**（src 目录）：
 
-- api：接口，和后端对应，使用 `axios` 库
-- assets：一些公用的 css 等资源
-- components：可复用的组件
-- router：动态路由组件
-- views：vue页面
-- app.vue/main.tx/style.css：一些全局配置
-- views：vue 页面
-- app.vue/main.ts/style.css：一些全局配置
+- `api/`：API 接口层，使用 `axios` 与后端通信
+- `assets/`：公共静态资源（CSS 等）
+- `components/`：可复用组件
+- `router/`：路由配置
+- `views/`：页面组件
+- `App.vue`、`main.ts`、`style.css`：应用入口和全局样式
 
-可能会在 `tsconfig.app.json` 这类配置文件里面出现一些很奇怪的报错，如果经检查确实没什么问题，很有可能是因为缓存机制，把报错的语句/文件删除了再恢复一般就正常了，实在有无法修复的奇怪报错可以忽略。
+> **提示**：如果 `tsconfig.app.json` 等配置文件中出现异常报错，经检查无实质性问题时，可能是缓存导致。可尝试删除并恢复相关语句/文件，通常即可解决。
 
-### postgresql
+### PostgreSQL
 
-可以使用docker拉取
-使用 docker 拉取，便于调整端口等配置。这里 postgresql 运行的端口用默认的 5432 端口（请确保这个端口可用，或者换到别的可用端口），默认用户名为 postgres，密码就是 123456，这个账号和密码用于访问数据库本身。
+使用 Docker 部署 PostgreSQL，便于配置管理：
 
 ```bash
-# 拉取 PostgreSQL
+# 拉取镜像
 docker pull postgres
-# 运行，配置尽量不要改
+
+# 运行容器（默认端口 5432，用户名 postgres，密码 123456）
 docker run --name postgresql \
   -e POSTGRES_PASSWORD=123456 \
   -p 5432:5432 \
   -d postgres
 ```
 
-PgAdmin（用于管理PostgreSQL）同样可以使用docker拉取，注意数据库的ip地址需要使用`host.docker.internal`
-PgAdmin 用于查询和管理 PostgreSQL，同样可以使用 docker 拉取，下面的邮箱 `test@123.com` 和密码是用于访问 PgAdmin，但注意 PgAdmin 中输入 docker 部署的本地服务器 ip 地址时需要使用 `host.docker.internal`，而不是 `localhost` 或者 `127.0.0.1`。
+> **注意**：确保 5432 端口可用，或根据需要修改映射端口。
+
+**PgAdmin（可选）**
+
+PgAdmin 用于可视化管理和查询 PostgreSQL，同样可通过 Docker 部署：
 
 ```bash
-# 一并拉取 pgadmin4 方便查询
+# 拉取 PgAdmin 镜像
 docker pull dpage/pgadmin4
 
+# 运行容器
 docker run -d -p 5433:80 \
   --name pgadmin4 \
   -e PGADMIN_DEFAULT_EMAIL=test@123.com \
@@ -83,31 +87,55 @@ docker run -d -p 5433:80 \
   dpage/pgadmin4
 ```
 
-### 后端
+> **重要**：在 PgAdmin 中连接 Docker 部署的 PostgreSQL 时，主机地址应使用 `host.docker.internal`，而非 `localhost` 或 `127.0.0.1`。
 
-运行后端：
+### RabbitMQ
+
+使用 Docker 部署 RabbitMQ（含管理界面）：
 
 ```bash
-# 在 backend 目录
-go mod tidy # 自动处理依赖关系
-go run main.go # 运行项目，端口 8888
+docker run -d \
+  --name rabbitmq \
+  -p 5672:5672 \
+  -p 15672:15672 \
+  -e RABBITMQ_DEFAULT_USER=admin \
+  -e RABBITMQ_DEFAULT_PASS=123456 \
+  rabbitmq:management
 ```
 
-需要配置好`config/config.yaml`下的数据库连接信息
-并配置好：
-- `backend/config/config.yaml`：数据库连接 + `worker.address`（Python Worker 地址）
+管理界面地址：`http://localhost:15672`（用户名：admin，密码：123456）
+
+### 后端
+
+**启动步骤：**
+
+```bash
+cd backend
+go mod tidy  # 安装依赖
+go run main.go  # 启动服务（默认端口 8888）
+```
+
+**配置文件**
+
+需要配置 `backend/config/config.yaml`：
+- 数据库连接信息
+- `worker.address`：Python Worker 地址
+
+**API 文档**
 
 Swagger 地址：`http://localhost:8888/swagger/index.html`
 
-项目结构，MVC 模式：
-- api：用于收发 http 请求
-- db：数据库配置
-- models：模型，用于数据库存储和出入参
-- service：业务逻辑，可以与数据库交互/派发 Worker 任务
-- utils：一些工具方法
+**项目结构（MVC 模式）**
 
-`utils/response.go`中定义了统一的后端返回方法，直接在api层调用这些方法返回即可，统一的格式为：
-需要注意 `utils/response.go` 中定义了统一的后端返回方法，只需要直接在 api 层调用这些方法返回就行了，统一的格式为：
+- `api/`：HTTP 请求处理层
+- `db/`：数据库连接配置
+- `models/`：数据模型（数据库映射与请求/响应结构）
+- `service/`：业务逻辑层（数据库操作与 Worker 任务派发）
+- `utils/`：工具函数
+
+**统一响应格式**
+
+`utils/response.go` 定义了统一的 API 响应方法，响应格式如下：
 
 ```json
 {
@@ -117,13 +145,16 @@ Swagger 地址：`http://localhost:8888/swagger/index.html`
 }
 ```
 
-比如要返回一个失败的请求，就可以：
+使用示例：
 
 ```go
+// 返回失败响应
 utils.Fail(c, http.StatusInternalServerError, err.Error())
 ```
 
-models 中的结构体注释建议都写，因为这个项目中理论上正常的数据每一项都是非空的，比如：
+**数据模型规范**
+
+建议为所有模型字段添加 GORM 标签，特别是非空约束。例如：
 
 ```go
 type BinanceTrade struct {
@@ -134,11 +165,11 @@ type BinanceTrade struct {
 }
 ```
 
-> 风险分析更新 (Risk Analysis Update)
-> 我们在 `arbitrage_opportunities` 表中新增了 **`risk_metrics_json`** (JSONB) 字段。
-> 现在每次运行 `analyse` 任务时，除了计算利润，还会自动调用 Python 端的风险模型，计算包括 **滑点 (Slippage)**、**波动率 (Volatility)** 和 **风险评分 (Risk Score)** 等指标，并存入该字段。
+### 数据分析引擎
 
-### data 分析引擎（Python Worker）
+Python Worker 负责执行数据采集、聚合和分析任务。
+
+**启动步骤：**
 
 ```bash
 cd data
@@ -146,7 +177,7 @@ pip install -r requirements.txt
 python server.py
 ```
 
-`data/server.py` 是 gRPC Worker：后端通过 `worker.address` 调用它执行采集/聚合/分析任务。
+`data/server.py` 作为 gRPC Worker 服务，后端通过 `worker.address` 调用其执行各类任务。
 
 ## 系统部署指南
 

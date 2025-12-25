@@ -84,7 +84,7 @@ func (s *Server) createTask(ctx context.Context, taskID, taskType string, params
 	}
 	return &taskpb.TaskResponse{
 		TaskId: task.TaskID,
-		Status: taskpb.TaskStatus_TASK_STATUS_RUNNING,
+		Status: taskpb.TaskStatus_RUNNING,
 	}, nil
 }
 

@@ -627,3 +627,321 @@ class TestSaveResults:
 
             # 验证回滚被调用（如果发生异常）
             # 注意：由于使用了 context manager，可能不会调用 rollback
+
+
+class TestParseTimestamp:
+    """
+    测试时间戳解析函数
+    """
+
+    def test_parse_timestamp_valid(self):
+        """
+        测试：解析有效的时间戳字符串
+        """
+        from block_chain.analyse import _parse_timestamp
+
+        result = _parse_timestamp("2025-01-01 10:00:00")
+        assert isinstance(result, pd.Timestamp)
+        assert result.tz is not None
+
+    def test_parse_timestamp_empty(self):
+        """
+        测试：空字符串
+        """
+        from block_chain.analyse import _parse_timestamp
+
+        result = _parse_timestamp("")
+        assert result is None
+
+    def test_parse_timestamp_none(self):
+        """
+        测试：None值
+        """
+        from block_chain.analyse import _parse_timestamp
+
+        result = _parse_timestamp(None)
+        assert result is None
+
+
+class TestEnsureBatchExists:
+    """
+    测试确保批次存在函数
+    """
+
+    def test_ensure_batch_exists_batch_exists(self):
+        """
+        测试：批次已存在
+        """
+        from block_chain.analyse import ensure_batch_exists
+
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_conn.cursor.return_value.__enter__ = lambda x: mock_cur
+        mock_conn.cursor.return_value.__exit__ = lambda *args: None
+        mock_cur.fetchone.return_value = (1,)  # 批次存在
+
+        ensure_batch_exists(mock_conn, 1)
+
+        # 应该查询批次，但不创建
+        assert mock_cur.execute.called
+        # 如果批次已存在，不会调用commit（因为只在创建批次时才commit）
+        # 但为了代码一致性，可能会调用commit，所以不强制检查
+
+    def test_ensure_batch_exists_batch_not_exists(self):
+        """
+        测试：批次不存在，自动创建
+        """
+        from block_chain.analyse import ensure_batch_exists
+
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_conn.cursor.return_value.__enter__ = lambda x: mock_cur
+        mock_conn.cursor.return_value.__exit__ = lambda *args: None
+        mock_cur.fetchone.return_value = None  # 批次不存在
+
+        ensure_batch_exists(mock_conn, 1)
+
+        # 应该创建批次
+        assert mock_cur.execute.call_count >= 2  # SELECT + INSERT
+        assert mock_conn.commit.called
+
+    def test_ensure_batch_exists_zero_batch_id(self):
+        """
+        测试：batch_id为0或None，不执行任何操作
+        """
+        from block_chain.analyse import ensure_batch_exists
+
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_conn.cursor.return_value.__enter__ = lambda x: mock_cur
+        mock_conn.cursor.return_value.__exit__ = lambda *args: None
+
+        ensure_batch_exists(mock_conn, 0)
+        ensure_batch_exists(mock_conn, None)
+
+        # 不应该执行任何操作
+        assert not mock_cur.execute.called
+
+
+class TestRunAnalyse:
+    """
+    测试主分析函数
+    """
+
+    @patch("block_chain.analyse.fetch_price_pairs")
+    @patch("block_chain.analyse.analyze_opportunities")
+    @patch("block_chain.analyse.save_results")
+    @patch("block_chain.analyse.ensure_batch_exists")
+    @patch("block_chain.analyse.check_task", return_value=False)
+    @patch("block_chain.analyse.update_task_status")
+    @patch("block_chain.analyse.psycopg2.connect")
+    def test_run_analyse_success(
+        self,
+        mock_connect,
+        mock_update_status,
+        mock_check_task,
+        mock_ensure_batch,
+        mock_save_results,
+        mock_analyze,
+        mock_fetch,
+    ):
+        """
+        测试：成功运行分析
+        """
+        from block_chain.analyse import run_analyse
+
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_fetch.return_value = []
+        mock_analyze.return_value = []
+
+        config_json = '{"strategy": {}, "batch_id": 1, "overwrite": false}'
+
+        run_analyse("test_task", config_json)
+
+        mock_ensure_batch.assert_called_once()
+        mock_fetch.assert_called_once()
+        mock_analyze.assert_called_once()
+        mock_save_results.assert_called_once()
+        mock_update_status.assert_called_once_with("test_task", 1)
+
+    @patch("block_chain.analyse.update_task_status")
+    @patch("block_chain.analyse.psycopg2.connect")
+    def test_run_analyse_invalid_time_range(
+        self,
+        mock_connect,
+        mock_update_status,
+    ):
+        """
+        测试：无效的时间范围（start > end）
+        """
+        from block_chain.analyse import run_analyse
+
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+
+        config_json = (
+            '{"strategy": {"start": "2025-01-02", "end": "2025-01-01"}, '
+            '"batch_id": 1, "overwrite": false}'
+        )
+
+        run_analyse("test_task", config_json)
+
+        mock_update_status.assert_called_once_with("test_task", 2)
+
+    @patch("block_chain.analyse.fetch_price_pairs")
+    @patch("block_chain.analyse.ensure_batch_exists")
+    @patch("block_chain.analyse.check_task", return_value=False)
+    @patch("block_chain.analyse.update_task_status")
+    @patch("block_chain.analyse.psycopg2.connect")
+    def test_run_analyse_exception_handling(
+        self,
+        mock_connect,
+        mock_update_status,
+        mock_check_task,
+        mock_ensure_batch,
+        mock_fetch,
+    ):
+        """
+        测试：异常处理和回滚
+        """
+        from block_chain.analyse import run_analyse
+
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_fetch.side_effect = Exception("Database error")
+
+        config_json = '{"strategy": {}, "batch_id": 1, "overwrite": false}'
+
+        with pytest.raises(Exception, match="Database error"):
+            run_analyse("test_task", config_json)
+
+        mock_conn.rollback.assert_called_once()
+        mock_update_status.assert_called_once_with("test_task", 2)
+
+    @patch("block_chain.analyse.fetch_price_pairs")
+    @patch("block_chain.analyse.analyze_opportunities")
+    @patch("block_chain.analyse.save_results")
+    @patch("block_chain.analyse.ensure_batch_exists")
+    @patch("block_chain.analyse.check_task")
+    @patch("block_chain.analyse.update_task_status")
+    @patch("block_chain.analyse.psycopg2.connect")
+    def test_run_analyse_task_cancelled(
+        self,
+        mock_connect,
+        mock_update_status,
+        mock_check_task,
+        mock_ensure_batch,
+        mock_save_results,
+        mock_analyze,
+        mock_fetch,
+    ):
+        """
+        测试：任务被取消
+        """
+        from block_chain.analyse import run_analyse
+
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_fetch.return_value = []
+        mock_analyze.return_value = []
+        # 根据代码逻辑，check_task在最后才被调用一次（在else块中）
+        # 如果返回True，不会调用update_task_status
+        # 所以我们需要让check_task在第一次（也是唯一一次）调用时返回True
+        mock_check_task.return_value = True
+
+        config_json = '{"strategy": {}, "batch_id": 1, "overwrite": false}'
+
+        run_analyse("test_task", config_json)
+
+        # 由于check_task返回True，update_task_status不应该被调用
+        mock_update_status.assert_not_called()
+
+    @patch("block_chain.analyse.fetch_price_pairs")
+    @patch("block_chain.analyse.analyze_opportunities")
+    @patch("block_chain.analyse.save_results")
+    @patch("block_chain.analyse.ensure_batch_exists")
+    @patch("block_chain.analyse.check_task", return_value=False)
+    @patch("block_chain.analyse.update_task_status")
+    @patch("block_chain.analyse.psycopg2.connect")
+    def test_run_analyse_with_custom_strategy(
+        self,
+        mock_connect,
+        mock_update_status,
+        mock_check_task,
+        mock_ensure_batch,
+        mock_save_results,
+        mock_analyze,
+        mock_fetch,
+    ):
+        """
+        测试：使用自定义策略配置
+        """
+        from block_chain.analyse import run_analyse
+
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_fetch.return_value = []
+        mock_analyze.return_value = []
+
+        config_json = (
+            '{"strategy": {"initial_investment": 50000, "profit_threshold": 5}, '
+            '"batch_id": 2, "overwrite": true, "experiment_id": 123}'
+        )
+
+        run_analyse("test_task", config_json)
+
+        # 验证analyze_opportunities被调用，并且策略参数被传递
+        assert mock_analyze.called
+        call_args = mock_analyze.call_args
+        strategy = call_args[0][1]
+        assert strategy["initial_investment"] == 50000
+        assert strategy["profit_threshold"] == 5
+
+    @patch("block_chain.analyse.fetch_price_pairs")
+    @patch("block_chain.analyse.analyze_opportunities")
+    @patch("block_chain.analyse.save_results")
+    @patch("block_chain.analyse.ensure_batch_exists")
+    @patch("block_chain.analyse.check_task", return_value=False)
+    @patch("block_chain.analyse.update_task_status")
+    @patch("block_chain.analyse.psycopg2.connect")
+    def test_run_analyse_with_time_range(
+        self,
+        mock_connect,
+        mock_update_status,
+        mock_check_task,
+        mock_ensure_batch,
+        mock_save_results,
+        mock_analyze,
+        mock_fetch,
+    ):
+        """
+        测试：使用时间范围
+        """
+        from block_chain.analyse import run_analyse
+
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_fetch.return_value = []
+        mock_analyze.return_value = []
+
+        config_json = (
+            '{"strategy": {"start": "2025-01-01", "end": "2025-01-02"}, '
+            '"batch_id": 1, "overwrite": false}'
+        )
+
+        run_analyse("test_task", config_json)
+
+        # 验证fetch_price_pairs被调用，并且时间参数被传递
+        assert mock_fetch.called
+        call_args = mock_fetch.call_args
+        # 参数可能是位置参数或关键字参数
+        if len(call_args) > 1 and "start_time" in call_args[1]:
+            start_time = call_args[1]["start_time"]
+            end_time = call_args[1]["end_time"]
+        else:
+            # 可能是位置参数
+            start_time = call_args[0][2] if len(call_args[0]) > 2 else None
+            end_time = call_args[0][3] if len(call_args[0]) > 3 else None
+        assert start_time is not None
+        assert end_time is not None

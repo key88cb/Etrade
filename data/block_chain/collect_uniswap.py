@@ -1,5 +1,5 @@
 import time
-from typing import Any, Iterable
+from typing import Any, Iterable, Optional
 
 import pandas as pd
 import psycopg2
@@ -89,13 +89,14 @@ def fetch_all_swaps(task_id: str, pool_address: str, start_ts: int, end_ts: int)
 
 
 def process_and_store_uniswap_data(
-    task_id: str, swaps_data: Iterable[dict[str, Any]]
+    task_id: str, swaps_data: Iterable[dict[str, Any]], conn: Optional[Any] = None
 ) -> int:
     """
     描述：处理数据并存入数据库。
     参数：
         task_id: 任务ID
         swaps_data: Uniswap数据
+        conn: 数据库连接（可选），如果提供则使用该连接，否则创建新连接
     返回值：写入的记录数量
     """
     swaps = list(swaps_data)
@@ -128,35 +129,97 @@ def process_and_store_uniswap_data(
         logger.info("没有可写入的数据。")
         return 0
 
-    with psycopg2.connect(
-        host=db_config["host"],
-        port=db_config["port"],
-        dbname=db_config["database"],
-        user=db_config["username"],
-        password=db_config["password"],
-    ) as conn, conn.cursor() as cur:
-        insert_sql = """
-        INSERT INTO uniswap_swaps (block_time, price, amount_eth, amount_usdt, gas_price, tx_hash)
-        VALUES %s
-        """
-        execute_values(cur, insert_sql, records, page_size=1000)
+    # 如果提供了连接，使用它；否则创建新连接
+    if conn is not None:
+        with conn.cursor() as cur:
+            insert_sql = """
+            INSERT INTO uniswap_swaps (block_time, price, amount_eth, amount_usdt, gas_price, tx_hash)
+            VALUES %s
+            """
+            execute_values(cur, insert_sql, records, page_size=1000)
+        # 不在这里提交，由调用者控制事务
+    else:
+        with psycopg2.connect(
+            host=db_config["host"],
+            port=db_config["port"],
+            dbname=db_config["database"],
+            user=db_config["username"],
+            password=db_config["password"],
+        ) as new_conn, new_conn.cursor() as cur:
+            insert_sql = """
+            INSERT INTO uniswap_swaps (block_time, price, amount_eth, amount_usdt, gas_price, tx_hash)
+            VALUES %s
+            """
+            execute_values(cur, insert_sql, records, page_size=1000)
     logger.info(f"成功写入 {len(records)} 条 Uniswap 记录。")
     return len(records)
 
 
 def collect_uniswap(task_id: str, pool_address: str, start_ts: int, end_ts: int) -> int:
+    """
+    描述：收集 Uniswap 数据（作为事务处理，如果任务取消则完全回滚）
+    参数：
+        task_id: 任务ID
+        pool_address: 池地址
+        start_ts: 起始时间戳（秒级）
+        end_ts: 终止时间戳（秒级）
+    返回值：导入的总行数
+    """
+    conn = None
     try:
+        # 创建数据库连接并开始事务
+        conn = psycopg2.connect(
+            host=db_config["host"],
+            port=db_config["port"],
+            dbname=db_config["database"],
+            user=db_config["username"],
+            password=db_config["password"],
+        )
+        conn.autocommit = False  # 禁用自动提交，使用事务
+        logger.info("已开启数据库事务，所有导入操作将在事务中执行")
+
         swaps = fetch_all_swaps(task_id, pool_address, start_ts, end_ts)
         if check_task(task_id):
-            logger.info(f"任务 {task_id} 已取消，停止写入 Uniswap 数据")
+            logger.info(f"任务 {task_id} 已取消，回滚所有已导入的数据")
+            conn.rollback()
+            logger.info("已回滚所有数据")
             return 0
-        rows_counter = process_and_store_uniswap_data(task_id, swaps)
-        update_task_status(task_id, "SUCCESS")
+
+        rows_counter = process_and_store_uniswap_data(task_id, swaps, conn)
+
+        if check_task(task_id):
+            logger.info(f"任务 {task_id} 已取消，回滚所有已导入的数据")
+            conn.rollback()
+            logger.info("已回滚所有数据")
+            return 0
+
+        # 所有数据导入成功，提交事务
+        conn.commit()
+        logger.info("事务已提交，所有数据已成功导入")
+        # 在标记成功前，再次检查任务是否被取消
+        if check_task(task_id):
+            logger.info(f"任务 {task_id} 已取消，不标记为成功")
+        else:
+            update_task_status(task_id, "SUCCESS")
         return rows_counter
     except Exception as e:
         logger.error(f"获取Uniswap数据失败: {e}")
+        # 确保在异常情况下回滚事务
+        if conn is not None:
+            try:
+                conn.rollback()
+                logger.info("发生异常，已回滚所有数据")
+            except Exception as rollback_error:
+                logger.error(f"回滚事务失败: {rollback_error}")
         update_task_status(task_id, "FAILED")
         return 0
+    finally:
+        # 确保关闭数据库连接
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception as close_error:
+                logger.warning(f"关闭数据库连接失败: {close_error}")
 
 
 if __name__ == "__main__":

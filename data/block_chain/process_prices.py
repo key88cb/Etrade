@@ -171,8 +171,14 @@ def run_process_prices(task_id: str, **kwargs: Any):
         update_task_status(task_id, 2)
         raise
     else:
-        logger.info(f"聚合完成，共写入 {len(df_final)} 条记录，耗时 {duration:.2f}s")
-        update_task_status(task_id, 1)
+        # 在标记成功前，再次检查任务是否被取消
+        if check_task(task_id):
+            logger.info(f"任务 {task_id} 已取消，不标记为成功")
+        else:
+            logger.info(
+                f"聚合完成，共写入 {len(df_final)} 条记录，耗时 {duration:.2f}s"
+            )
+            update_task_status(task_id, 1)
     finally:
         conn.close()
 

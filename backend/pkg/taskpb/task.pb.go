@@ -7,12 +7,11 @@
 package taskpb
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -26,25 +25,25 @@ const (
 type TaskStatus int32
 
 const (
-	TaskStatus_TASK_STATUS_RUNNING  TaskStatus = 0 // 任务正在执行中
-	TaskStatus_TASK_STATUS_SUCCESS  TaskStatus = 1 // 任务成功完成
-	TaskStatus_TASK_STATUS_FAILED   TaskStatus = 2 // 任务执行失败
-	TaskStatus_TASK_STATUS_CANCELED TaskStatus = 3 // 任务被取消
+	TaskStatus_RUNNING   TaskStatus = 0 // 任务正在执行中
+	TaskStatus_SUCCESS   TaskStatus = 1 // 任务成功完成
+	TaskStatus_FAILED    TaskStatus = 2 // 任务执行失败
+	TaskStatus_CANCELLED TaskStatus = 3 // 任务被取消
 )
 
 // Enum value maps for TaskStatus.
 var (
 	TaskStatus_name = map[int32]string{
-		0: "TASK_STATUS_RUNNING",
-		1: "TASK_STATUS_SUCCESS",
-		2: "TASK_STATUS_FAILED",
-		3: "TASK_STATUS_CANCELED",
+		0: "RUNNING",
+		1: "SUCCESS",
+		2: "FAILED",
+		3: "CANCELLED",
 	}
 	TaskStatus_value = map[string]int32{
-		"TASK_STATUS_RUNNING":  0,
-		"TASK_STATUS_SUCCESS":  1,
-		"TASK_STATUS_FAILED":   2,
-		"TASK_STATUS_CANCELED": 3,
+		"RUNNING":   0,
+		"SUCCESS":   1,
+		"FAILED":    2,
+		"CANCELLED": 3,
 	}
 )
 
@@ -135,6 +134,66 @@ func (x *CollectBinanceRequest) GetChunkSize() int32 {
 	return 0
 }
 
+type CollectBinanceByDateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`     // 任务的唯一标识符
+	StartTs       int32                  `protobuf:"varint,2,opt,name=start_ts,json=startTs,proto3" json:"start_ts,omitempty"` // 起始时间
+	EndTs         int32                  `protobuf:"varint,3,opt,name=end_ts,json=endTs,proto3" json:"end_ts,omitempty"`       // 终止时间
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CollectBinanceByDateRequest) Reset() {
+	*x = CollectBinanceByDateRequest{}
+	mi := &file_task_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CollectBinanceByDateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CollectBinanceByDateRequest) ProtoMessage() {}
+
+func (x *CollectBinanceByDateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_task_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CollectBinanceByDateRequest.ProtoReflect.Descriptor instead.
+func (*CollectBinanceByDateRequest) Descriptor() ([]byte, []int) {
+	return file_task_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *CollectBinanceByDateRequest) GetTaskId() string {
+	if x != nil {
+		return x.TaskId
+	}
+	return ""
+}
+
+func (x *CollectBinanceByDateRequest) GetStartTs() int32 {
+	if x != nil {
+		return x.StartTs
+	}
+	return 0
+}
+
+func (x *CollectBinanceByDateRequest) GetEndTs() int32 {
+	if x != nil {
+		return x.EndTs
+	}
+	return 0
+}
+
 type CollectUniswapRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`                // 任务的唯一标识符
@@ -147,7 +206,7 @@ type CollectUniswapRequest struct {
 
 func (x *CollectUniswapRequest) Reset() {
 	*x = CollectUniswapRequest{}
-	mi := &file_task_proto_msgTypes[1]
+	mi := &file_task_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -159,7 +218,7 @@ func (x *CollectUniswapRequest) String() string {
 func (*CollectUniswapRequest) ProtoMessage() {}
 
 func (x *CollectUniswapRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[1]
+	mi := &file_task_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -172,7 +231,7 @@ func (x *CollectUniswapRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CollectUniswapRequest.ProtoReflect.Descriptor instead.
 func (*CollectUniswapRequest) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{1}
+	return file_task_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CollectUniswapRequest) GetTaskId() string {
@@ -217,7 +276,7 @@ type ProcessPricesRequest struct {
 
 func (x *ProcessPricesRequest) Reset() {
 	*x = ProcessPricesRequest{}
-	mi := &file_task_proto_msgTypes[2]
+	mi := &file_task_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -229,7 +288,7 @@ func (x *ProcessPricesRequest) String() string {
 func (*ProcessPricesRequest) ProtoMessage() {}
 
 func (x *ProcessPricesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[2]
+	mi := &file_task_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -242,7 +301,7 @@ func (x *ProcessPricesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProcessPricesRequest.ProtoReflect.Descriptor instead.
 func (*ProcessPricesRequest) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{2}
+	return file_task_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ProcessPricesRequest) GetTaskId() string {
@@ -299,7 +358,7 @@ type AnalyseRequest struct {
 
 func (x *AnalyseRequest) Reset() {
 	*x = AnalyseRequest{}
-	mi := &file_task_proto_msgTypes[3]
+	mi := &file_task_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -311,7 +370,7 @@ func (x *AnalyseRequest) String() string {
 func (*AnalyseRequest) ProtoMessage() {}
 
 func (x *AnalyseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[3]
+	mi := &file_task_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -324,7 +383,7 @@ func (x *AnalyseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnalyseRequest.ProtoReflect.Descriptor instead.
 func (*AnalyseRequest) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{3}
+	return file_task_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *AnalyseRequest) GetTaskId() string {
@@ -365,7 +424,7 @@ type TaskResponse struct {
 
 func (x *TaskResponse) Reset() {
 	*x = TaskResponse{}
-	mi := &file_task_proto_msgTypes[4]
+	mi := &file_task_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -377,7 +436,7 @@ func (x *TaskResponse) String() string {
 func (*TaskResponse) ProtoMessage() {}
 
 func (x *TaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_task_proto_msgTypes[4]
+	mi := &file_task_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -390,7 +449,7 @@ func (x *TaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskResponse.ProtoReflect.Descriptor instead.
 func (*TaskResponse) Descriptor() ([]byte, []int) {
-	return file_task_proto_rawDescGZIP(), []int{4}
+	return file_task_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *TaskResponse) GetTaskId() string {
@@ -404,7 +463,7 @@ func (x *TaskResponse) GetStatus() TaskStatus {
 	if x != nil {
 		return x.Status
 	}
-	return TaskStatus_TASK_STATUS_RUNNING
+	return TaskStatus_RUNNING
 }
 
 var File_task_proto protoreflect.FileDescriptor
@@ -417,7 +476,11 @@ const file_task_proto_rawDesc = "" +
 	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12+\n" +
 	"\x11import_percentage\x18\x02 \x01(\x05R\x10importPercentage\x12\x1d\n" +
 	"\n" +
-	"chunk_size\x18\x03 \x01(\x05R\tchunkSize\"\x85\x01\n" +
+	"chunk_size\x18\x03 \x01(\x05R\tchunkSize\"h\n" +
+	"\x1bCollectBinanceByDateRequest\x12\x17\n" +
+	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12\x19\n" +
+	"\bstart_ts\x18\x02 \x01(\x05R\astartTs\x12\x15\n" +
+	"\x06end_ts\x18\x03 \x01(\x05R\x05endTs\"\x85\x01\n" +
 	"\x15CollectUniswapRequest\x12\x17\n" +
 	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12!\n" +
 	"\fpool_address\x18\x02 \x01(\tR\vpoolAddress\x12\x19\n" +
@@ -441,15 +504,17 @@ const file_task_proto_rawDesc = "" +
 	"\rstrategy_json\x18\x04 \x01(\tR\fstrategyJson\"T\n" +
 	"\fTaskResponse\x12\x17\n" +
 	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12+\n" +
-	"\x06status\x18\x02 \x01(\x0e2\x13.task.v1.TaskStatusR\x06status*p\n" +
+	"\x06status\x18\x02 \x01(\x0e2\x13.task.v1.TaskStatusR\x06status*A\n" +
 	"\n" +
-	"TaskStatus\x12\x17\n" +
-	"\x13TASK_STATUS_RUNNING\x10\x00\x12\x17\n" +
-	"\x13TASK_STATUS_SUCCESS\x10\x01\x12\x16\n" +
-	"\x12TASK_STATUS_FAILED\x10\x02\x12\x18\n" +
-	"\x14TASK_STATUS_CANCELED\x10\x032\xa1\x02\n" +
+	"TaskStatus\x12\v\n" +
+	"\aRUNNING\x10\x00\x12\v\n" +
+	"\aSUCCESS\x10\x01\x12\n" +
+	"\n" +
+	"\x06FAILED\x10\x02\x12\r\n" +
+	"\tCANCELLED\x10\x032\xf6\x02\n" +
 	"\vTaskService\x12G\n" +
-	"\x0eCollectBinance\x12\x1e.task.v1.CollectBinanceRequest\x1a\x15.task.v1.TaskResponse\x12G\n" +
+	"\x0eCollectBinance\x12\x1e.task.v1.CollectBinanceRequest\x1a\x15.task.v1.TaskResponse\x12S\n" +
+	"\x14CollectBinanceByDate\x12$.task.v1.CollectBinanceByDateRequest\x1a\x15.task.v1.TaskResponse\x12G\n" +
 	"\x0eCollectUniswap\x12\x1e.task.v1.CollectUniswapRequest\x1a\x15.task.v1.TaskResponse\x12E\n" +
 	"\rProcessPrices\x12\x1d.task.v1.ProcessPricesRequest\x1a\x15.task.v1.TaskResponse\x129\n" +
 	"\aAnalyse\x12\x17.task.v1.AnalyseRequest\x1a\x15.task.v1.TaskResponseB\x1bZ\x19backend/pkg/taskpb;taskpbb\x06proto3"
@@ -467,29 +532,32 @@ func file_task_proto_rawDescGZIP() []byte {
 }
 
 var file_task_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_task_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_task_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_task_proto_goTypes = []any{
-	(TaskStatus)(0),               // 0: task.v1.TaskStatus
-	(*CollectBinanceRequest)(nil), // 1: task.v1.CollectBinanceRequest
-	(*CollectUniswapRequest)(nil), // 2: task.v1.CollectUniswapRequest
-	(*ProcessPricesRequest)(nil),  // 3: task.v1.ProcessPricesRequest
-	(*AnalyseRequest)(nil),        // 4: task.v1.AnalyseRequest
-	(*TaskResponse)(nil),          // 5: task.v1.TaskResponse
-	nil,                           // 6: task.v1.ProcessPricesRequest.DbOverridesEntry
+	(TaskStatus)(0),                     // 0: task.v1.TaskStatus
+	(*CollectBinanceRequest)(nil),       // 1: task.v1.CollectBinanceRequest
+	(*CollectBinanceByDateRequest)(nil), // 2: task.v1.CollectBinanceByDateRequest
+	(*CollectUniswapRequest)(nil),       // 3: task.v1.CollectUniswapRequest
+	(*ProcessPricesRequest)(nil),        // 4: task.v1.ProcessPricesRequest
+	(*AnalyseRequest)(nil),              // 5: task.v1.AnalyseRequest
+	(*TaskResponse)(nil),                // 6: task.v1.TaskResponse
+	nil,                                 // 7: task.v1.ProcessPricesRequest.DbOverridesEntry
 }
 var file_task_proto_depIdxs = []int32{
-	6, // 0: task.v1.ProcessPricesRequest.db_overrides:type_name -> task.v1.ProcessPricesRequest.DbOverridesEntry
+	7, // 0: task.v1.ProcessPricesRequest.db_overrides:type_name -> task.v1.ProcessPricesRequest.DbOverridesEntry
 	0, // 1: task.v1.TaskResponse.status:type_name -> task.v1.TaskStatus
 	1, // 2: task.v1.TaskService.CollectBinance:input_type -> task.v1.CollectBinanceRequest
-	2, // 3: task.v1.TaskService.CollectUniswap:input_type -> task.v1.CollectUniswapRequest
-	3, // 4: task.v1.TaskService.ProcessPrices:input_type -> task.v1.ProcessPricesRequest
-	4, // 5: task.v1.TaskService.Analyse:input_type -> task.v1.AnalyseRequest
-	5, // 6: task.v1.TaskService.CollectBinance:output_type -> task.v1.TaskResponse
-	5, // 7: task.v1.TaskService.CollectUniswap:output_type -> task.v1.TaskResponse
-	5, // 8: task.v1.TaskService.ProcessPrices:output_type -> task.v1.TaskResponse
-	5, // 9: task.v1.TaskService.Analyse:output_type -> task.v1.TaskResponse
-	6, // [6:10] is the sub-list for method output_type
-	2, // [2:6] is the sub-list for method input_type
+	2, // 3: task.v1.TaskService.CollectBinanceByDate:input_type -> task.v1.CollectBinanceByDateRequest
+	3, // 4: task.v1.TaskService.CollectUniswap:input_type -> task.v1.CollectUniswapRequest
+	4, // 5: task.v1.TaskService.ProcessPrices:input_type -> task.v1.ProcessPricesRequest
+	5, // 6: task.v1.TaskService.Analyse:input_type -> task.v1.AnalyseRequest
+	6, // 7: task.v1.TaskService.CollectBinance:output_type -> task.v1.TaskResponse
+	6, // 8: task.v1.TaskService.CollectBinanceByDate:output_type -> task.v1.TaskResponse
+	6, // 9: task.v1.TaskService.CollectUniswap:output_type -> task.v1.TaskResponse
+	6, // 10: task.v1.TaskService.ProcessPrices:output_type -> task.v1.TaskResponse
+	6, // 11: task.v1.TaskService.Analyse:output_type -> task.v1.TaskResponse
+	7, // [7:12] is the sub-list for method output_type
+	2, // [2:7] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
 	2, // [2:2] is the sub-list for extension extendee
 	0, // [0:2] is the sub-list for field type_name
@@ -506,7 +574,7 @@ func file_task_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_task_proto_rawDesc), len(file_task_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

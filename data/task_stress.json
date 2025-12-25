@@ -1,0 +1,15 @@
+{
+  "proto": "../protos/task.proto",
+  "call": "task.v1.TaskService.ProcessPrices",
+  "total": 200,
+  "concurrency": 100,
+  "insecure": true,
+  "data": {
+      "task_id": "5d6f9837-c4ac-4a88-b67e-cd1cb1e251fd",
+      "start_date": 1756684800,
+      "end_date": 1757030400,
+      "aggregation_interval": "1m",
+      "overwrite": true,
+      "db_overrides": {}
+  }
+}

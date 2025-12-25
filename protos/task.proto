@@ -8,7 +8,7 @@ service TaskService {
   // 收集币安数据
   rpc CollectBinance(CollectBinanceRequest) returns (TaskResponse);
   // 按日期收集币安数据
-  rpc CollectBinanceByDate(CollectBinaceByDateRequest) returns (TaskResponse);
+  rpc CollectBinanceByDate(CollectBinanceByDateRequest) returns (TaskResponse);
   // 收集Uniswap数据
   rpc CollectUniswap(CollectUniswapRequest) returns (TaskResponse);
   // 处理价格数据
@@ -19,10 +19,11 @@ service TaskService {
 
 // TaskStatus 定义任务的可能状态。
 enum TaskStatus {
-  TASK_STATUS_RUNNING = 0;     // 任务正在执行中
-  TASK_STATUS_SUCCESS = 1;     // 任务成功完成
-  TASK_STATUS_FAILED = 2;      // 任务执行失败
-  TASK_STATUS_CANCELED = 3;    // 任务被取消
+  WAIT = 0;        // 任务等待执行
+  RUNNING = 1;     // 任务正在执行中
+  SUCCESS = 2;     // 任务成功完成
+  FAILED = 3;      // 任务执行失败
+  CANCELLED = 4;    // 任务被取消
 }
 
 message CollectBinanceRequest {
@@ -31,7 +32,7 @@ message CollectBinanceRequest {
   int32 chunk_size = 3;        // 分块大小
 }
 
-message CollectBinaceByDateRequest {
+message CollectBinanceByDateRequest {
   string task_id = 1;         // 任务的唯一标识符
   int32 start_ts = 2;         // 起始时间
   int32 end_ts = 3;           // 终止时间

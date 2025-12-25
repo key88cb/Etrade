@@ -83,6 +83,20 @@ docker run -d -p 5433:80 \
   dpage/pgadmin4
 ```
 
+### RabitMQ
+
+使用docker安装
+
+```bash
+docker run -d \
+  --name rabbitmq \
+  -p 5672:5672 \
+  -p 15672:15672 \
+  -e RABBITMQ_DEFAULT_USER=admin \
+  -e RABBITMQ_DEFAULT_PASS=123456 \
+  rabbitmq:management
+```
+
 ### 后端
 
 运行后端：

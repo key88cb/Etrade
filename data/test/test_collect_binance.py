@@ -400,7 +400,7 @@ class TestImportDataToDatabase:
         mock_read_csv.return_value = [sample_chunk]
 
         # process_chunk 会修改 rows_counter，所以我们需要让它实际执行
-        def side_effect(task_id, chunk, idx, counter, target):
+        def side_effect(task_id, chunk, idx, counter, target, conn=None):
             counter[0] += len(chunk)
             counter[1] += len(chunk)
             return (True, len(chunk), len(chunk), False)
@@ -446,7 +446,7 @@ class TestImportDataToDatabase:
         mock_read_csv.return_value = [sample_chunk]
 
         # 第一个chunk达到目标行数
-        def side_effect(task_id, chunk, idx, counter, target):
+        def side_effect(task_id, chunk, idx, counter, target, conn=None):
             counter[0] += len(chunk)
             counter[1] += len(chunk)
             should_stop = counter[0] >= target if target else False
@@ -537,7 +537,7 @@ class TestImportDataToDatabase:
         )
         mock_read_csv.return_value = [chunk1, chunk2]
 
-        def side_effect(task_id, chunk, idx, counter, target):
+        def side_effect(task_id, chunk, idx, counter, target, conn=None):
             counter[0] += len(chunk)
             counter[1] += len(chunk)
             return (True, len(chunk), len(chunk), False)
@@ -596,7 +596,7 @@ class TestImportDataToDatabase:
         mock_read_csv.return_value = [chunk1, chunk2]
 
         # 第一个chunk达到目标行数，返回 should_stop=True
-        def side_effect(task_id, chunk, idx, counter, target):
+        def side_effect(task_id, chunk, idx, counter, target, conn=None):
             counter[0] += len(chunk)
             counter[1] += len(chunk)
             should_stop = counter[0] >= target if target else False

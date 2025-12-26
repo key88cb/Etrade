@@ -269,14 +269,30 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+:global(:root) {
+  --gh-bg: #f6f8fa;
+  --gh-surface: #ffffff;
+  --gh-border: #d0d7de;
+  --gh-muted: #57606a;
+  --gh-accent: #0969da;
+}
+
+:global(.dark) {
+  --gh-bg: #0d1117;
+  --gh-surface: #161b22;
+  --gh-border: #30363d;
+  --gh-muted: #7d8590;
+  --gh-accent: #58a6ff;
+}
+
 .page-container {
-  padding: 24px;
-  background-color: #f0f2f5;
-  min-height: 100vh;
+  padding: 0;
+  background-color: transparent;
 }
 .main-card {
-  background: #ffffff;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-border);
+  box-shadow: none;
   border-radius: 12px;
 }
 .card-header {
@@ -284,12 +300,12 @@ onBeforeUnmount(() => {
   align-items: center;
   font-size: 20px;
   font-weight: 600;
-  color: #52c41a;
+  color: var(--gh-accent);
 }
 .header-icon {
   font-size: 24px;
   margin-right: 8px;
-  color: #52c41a;
+  color: var(--gh-accent);
 }
 .header-title {
   margin-right: 10px;
@@ -313,7 +329,7 @@ onBeforeUnmount(() => {
 }
 .loading-text {
   margin-top: 10px;
-  color: #1890ff;
+  color: var(--gh-accent);
 }
 .error-alert {
   margin-bottom: 24px;

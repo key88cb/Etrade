@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import * as echarts from 'echarts';
 import api, { type TemplatePayload } from '../api';
 
 interface TemplateItem {
@@ -23,6 +24,19 @@ const form = reactive<TemplatePayload>({
 });
 const errorMessage = ref('');
 
+const chartRef = ref<HTMLDivElement | null>(null);
+let chart: echarts.ECharts | null = null;
+
+const totalTemplates = computed(() => templates.value.length);
+const typeCounts = computed(() => {
+  const counts: Record<string, number> = {};
+  for (const t of templates.value) {
+    const key = t.task_type ?? 'unknown';
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+  return counts;
+});
+
 const resetForm = () => {
   form.name = '';
   form.task_type = 'collect_binance';
@@ -40,6 +54,7 @@ const fetchTemplates = async () => {
     errorMessage.value = error?.message ?? '模板列表获取失败';
   } finally {
     loading.value = false;
+    nextTick(renderChart);
   }
 };
 
@@ -109,14 +124,47 @@ const handleConfigChange = (event: Event) => {
 };
 
 onMounted(fetchTemplates);
+
+const renderChart = () => {
+  if (!chartRef.value) return;
+  if (!chart) chart = echarts.init(chartRef.value);
+  const entries = Object.entries(typeCounts.value)
+    .map(([name, value]) => ({ name, value }))
+    .filter((x) => x.value > 0);
+  chart.setOption({
+    tooltip: { trigger: 'item' },
+    toolbox: { feature: { saveAsImage: {} } },
+    legend: { bottom: 0 },
+    series: [
+      {
+        type: 'pie',
+        radius: ['35%', '65%'],
+        center: ['50%', '45%'],
+        data: entries,
+        label: { formatter: '{b}: {c}' },
+      },
+    ],
+  });
+};
+
+watch(
+  () => templates.value,
+  () => nextTick(renderChart),
+  { deep: true },
+);
+
+onBeforeUnmount(() => {
+  chart?.dispose();
+  chart = null;
+});
 </script>
 
 <template>
   <div class="p-6 lg:p-8 space-y-6">
     <header class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-semibold text-gray-900">模板管理</h1>
-        <p class="text-sm text-gray-500">维护任务参数模板，支持一键运行。</p>
+        <h1 class="text-2xl font-semibold text-[#24292f] dark:text-[#e6edf3]">模板管理</h1>
+        <p class="text-sm text-[#57606a] dark:text-[#7d8590]">维护任务参数模板，支持一键运行。</p>
       </div>
       <button
         type="button"
@@ -134,10 +182,49 @@ onMounted(fetchTemplates);
       {{ runMessage }}
     </div>
 
-    <div class="bg-white rounded-lg shadow border">
+    <a-row :gutter="16">
+      <a-col :xs="24" :sm="8" :lg="6">
+        <a-card size="small" :bordered="false" class="shadow-sm">
+          <a-statistic title="模板总数" :value="totalTemplates" />
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :sm="8" :lg="6">
+        <a-card size="small" :bordered="false" class="shadow-sm">
+          <a-statistic title="analyse 模板" :value="typeCounts.analyse ?? 0" />
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :sm="8" :lg="6">
+        <a-card size="small" :bordered="false" class="shadow-sm">
+          <a-statistic title="collect_* 模板" :value="(typeCounts.collect_binance ?? 0) + (typeCounts.collect_uniswap ?? 0)" />
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :sm="8" :lg="6">
+        <a-card size="small" :bordered="false" class="shadow-sm">
+          <div class="text-xs text-[#57606a] dark:text-[#7d8590]">模板类型分布</div>
+          <div class="text-xs text-[#57606a] dark:text-[#7d8590] mt-1">用于快速查看当前模板覆盖情况</div>
+        </a-card>
+      </a-col>
+    </a-row>
+
+    <div class="bg-white dark:bg-[#161b22] rounded-lg shadow border border-[#d0d7de] dark:border-[#30363d] p-4">
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-sm font-medium text-[#24292f] dark:text-[#e6edf3]">类型分布（Pie）</div>
+        <button
+          type="button"
+          class="text-sm text-blue-600 hover:underline"
+          :disabled="loading"
+          @click="fetchTemplates"
+        >
+          刷新
+        </button>
+      </div>
+      <div ref="chartRef" style="height: 260px;"></div>
+    </div>
+
+    <div class="bg-white dark:bg-[#161b22] rounded-lg shadow border border-[#d0d7de] dark:border-[#30363d]">
       <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 text-sm">
-          <thead class="bg-gray-50 text-gray-500 text-xs uppercase">
+        <table class="min-w-full divide-y divide-[#d0d7de] dark:divide-[#30363d] text-sm">
+          <thead class="bg-[#f6f8fa] dark:bg-[#0d1117] text-[#57606a] dark:text-[#7d8590] text-xs uppercase">
             <tr>
               <th class="px-4 py-2 text-left">名称</th>
               <th class="px-4 py-2 text-left">任务类型</th>
@@ -145,11 +232,11 @@ onMounted(fetchTemplates);
               <th class="px-4 py-2 text-right">操作</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-200">
+          <tbody class="divide-y divide-[#d0d7de] dark:divide-[#30363d]">
             <tr v-for="item in templates" :key="item.id">
               <td class="px-4 py-2">{{ item.name }}</td>
               <td class="px-4 py-2 font-mono text-xs">{{ item.task_type }}</td>
-              <td class="px-4 py-2 text-xs text-gray-500">{{ item.updated_at ?? '-' }}</td>
+              <td class="px-4 py-2 text-xs text-[#57606a] dark:text-[#7d8590]">{{ item.updated_at ?? '-' }}</td>
               <td class="px-4 py-2 text-right space-x-2">
                 <button class="text-blue-600 hover:underline text-xs" @click="editTemplate(item)">
                   编辑
@@ -163,7 +250,7 @@ onMounted(fetchTemplates);
               </td>
             </tr>
             <tr v-if="!loading && templates.length === 0">
-              <td colspan="4" class="px-4 py-6 text-center text-gray-500">暂无模板</td>
+              <td colspan="4" class="px-4 py-6 text-center text-[#57606a] dark:text-[#7d8590]">暂无模板</td>
             </tr>
           </tbody>
         </table>
@@ -175,12 +262,12 @@ onMounted(fetchTemplates);
       class="fixed inset-0 bg-black/30 flex items-center justify-center z-10"
       @click.self="formVisible = false"
     >
-      <div class="bg-white rounded-lg shadow-lg w-full max-w-lg p-6 space-y-4">
+      <div class="bg-white dark:bg-[#161b22] rounded-lg shadow-lg w-full max-w-lg p-6 space-y-4 border border-[#d0d7de] dark:border-[#30363d]">
         <h2 class="text-lg font-semibold">
           {{ editId ? '编辑模板' : '新建模板' }}
         </h2>
         <div class="space-y-2">
-          <label class="text-sm text-gray-600">名称</label>
+          <label class="text-sm text-[#57606a] dark:text-[#7d8590]">名称</label>
           <input
             v-model="form.name"
             type="text"
@@ -188,7 +275,7 @@ onMounted(fetchTemplates);
           />
         </div>
         <div class="space-y-2">
-          <label class="text-sm text-gray-600">任务类型</label>
+          <label class="text-sm text-[#57606a] dark:text-[#7d8590]">任务类型</label>
           <select
             v-model="form.task_type"
             class="w-full border rounded px-3 py-2 text-sm"
@@ -200,21 +287,21 @@ onMounted(fetchTemplates);
           </select>
         </div>
         <div class="space-y-2">
-          <label class="text-sm text-gray-600">配置（JSON）</label>
+          <label class="text-sm text-[#57606a] dark:text-[#7d8590]">配置（JSON）</label>
           <textarea
             :value="formattedConfig"
             @input="handleConfigChange"
             rows="6"
             class="w-full border rounded px-3 py-2 text-xs font-mono"
           />
-          <p class="text-xs text-gray-500">
+          <p class="text-xs text-[#57606a] dark:text-[#7d8590]">
             根据任务类型填写对应字段，例如 collect_binance 需要 csv_path、import_percentage 等。
           </p>
         </div>
         <div class="flex justify-end gap-3">
           <button
             type="button"
-            class="px-4 py-2 text-sm text-gray-600"
+            class="px-4 py-2 text-sm text-[#57606a] dark:text-[#7d8590]"
             @click="formVisible = false"
           >
             取消

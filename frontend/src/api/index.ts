@@ -38,6 +38,10 @@ export interface TaskListParams {
   limit?: number;
 }
 
+export interface CancelTaskPayload {
+  reason?: string;
+}
+
 export interface TemplatePayload {
   name: string;
   task_type: string;
@@ -57,6 +61,11 @@ export interface ReportPayload {
   file_path?: string;
 }
 
+export interface ExperimentPayload {
+  batch_id: number;
+  description?: string;
+}
+
 const api = {
   getOpportunities: (params?: OpportunitiesParams) =>
     instance.get('/opportunities', { params }),
@@ -66,6 +75,8 @@ const api = {
   getTaskDetail: (taskId: string) => instance.get(`/tasks/${taskId}`),
   getTaskLogs: (taskId: string, params?: { limit?: number; offset?: number }) =>
     instance.get(`/tasks/${taskId}/logs`, { params }),
+  cancelTask: (taskId: string, payload?: CancelTaskPayload) =>
+    instance.post(`/tasks/${taskId}/cancel`, payload),
   getTemplates: () => instance.get('/templates'),
   createTemplate: (payload: TemplatePayload) => instance.post('/templates', payload),
   updateTemplate: (id: number, payload: TemplatePayload) =>
@@ -81,6 +92,16 @@ const api = {
   
   // 🌟 新增：删除报告接口
   deleteReport: (id: number) => instance.delete(`/reports/${id}`),
+
+  // Experiments
+  getExperiments: (params?: { batch_id?: number }) => instance.get('/experiments', { params }),
+  createExperiment: (payload: ExperimentPayload) => instance.post('/experiments', payload),
+  getExperiment: (id: number) => instance.get(`/experiments/${id}`),
+  getExperimentRuns: (id: number) => instance.get(`/experiments/${id}/runs`),
+  runExperiment: (
+    id: number,
+    payload: { template_id: number; task_id?: string; trigger?: string; overrides?: Record<string, unknown> },
+  ) => instance.post(`/experiments/${id}/runs`, payload),
 };
 
 export default api;

@@ -7,7 +7,7 @@ import (
 )
 
 // SetupRouter 配置路由
-func SetupRouter(taskHandler *TaskHandler, templateHandler *TemplateHandler, batchHandler *BatchHandler, reportHandler *ReportHandler) *gin.Engine {
+func SetupRouter(taskHandler *TaskHandler, templateHandler *TemplateHandler, batchHandler *BatchHandler, reportHandler *ReportHandler, experimentHandler *ExperimentHandler) *gin.Engine {
 	r := gin.Default()
 
 	// 配置CORS中间件，允许所有来源的跨域请求 (在开发阶段)
@@ -36,6 +36,9 @@ func SetupRouter(taskHandler *TaskHandler, templateHandler *TemplateHandler, bat
 		}
 		if reportHandler != nil {
 			reportHandler.Register(apiV1)
+		}
+		if experimentHandler != nil {
+			experimentHandler.Register(apiV1)
 		}
 	}
 

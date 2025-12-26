@@ -43,6 +43,7 @@ func main() {
 	templateService := service.NewTemplateService(db.GetDB(), taskManager, dispatcher)
 	batchService := service.NewBatchService(db.GetDB())
 	reportService := service.NewReportService(db.GetDB())
+	experimentService := service.NewExperimentService(db.GetDB(), templateService, taskManager)
 
 	go func() {
 		grpcCfg := grpcserver.Config{
@@ -59,7 +60,8 @@ func main() {
 	templateHandler := api.NewTemplateHandler(templateService, taskManager)
 	batchHandler := api.NewBatchHandler(batchService)
 	reportHandler := api.NewReportHandler(reportService)
-	r := api.SetupRouter(taskHandler, templateHandler, batchHandler, reportHandler)
+	experimentHandler := api.NewExperimentHandler(experimentService)
+	r := api.SetupRouter(taskHandler, templateHandler, batchHandler, reportHandler, experimentHandler)
 
 	docs.SwaggerInfo.BasePath = "/api/v1" // 告诉 swag API 的基础路径
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

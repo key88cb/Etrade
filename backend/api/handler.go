@@ -20,8 +20,8 @@ import (
 // @contact.name   项目负责人 Lhb
 // @contact.url    https://github.com/key88cb/Etrade
 
-// @license.name  Apache 2.0
-// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
+// @license.name  MIT
+// @license.url   https://opensource.org/license/mit/
 
 // @host         localhost:8888
 // @BasePath     /api/v1

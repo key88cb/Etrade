@@ -103,6 +103,20 @@ func (d *GRPCTaskDispatcher) Dispatch(ctx context.Context, task *models.Task) er
 				strategyJSON = string(data)
 			}
 		}
+		// experiment_id 不在 proto 字段中：把它塞进 strategy_json，让 Worker 解析后再提升到 config 顶层。
+		if exp, ok := task.ConfigJSON["experiment_id"]; ok && exp != nil {
+			var payload map[string]interface{}
+			if strategyJSON != "" {
+				_ = json.Unmarshal([]byte(strategyJSON), &payload)
+			}
+			if payload == nil {
+				payload = map[string]interface{}{}
+			}
+			payload["experiment_id"] = asInt64(exp)
+			if data, err := json.Marshal(payload); err == nil {
+				strategyJSON = string(data)
+			}
+		}
 		_, err := d.client.Analyse(reqCtx, &taskpb.AnalyseRequest{
 			TaskId:       task.TaskID,
 			BatchId:      batchID,

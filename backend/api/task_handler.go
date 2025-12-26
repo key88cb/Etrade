@@ -24,6 +24,7 @@ func (h *TaskHandler) Register(rg *gin.RouterGroup) {
 	rg.GET("/tasks", h.ListTasks)
 	rg.GET("/tasks/:task_id", h.GetTask)
 	rg.GET("/tasks/:task_id/logs", h.ListLogs)
+	rg.POST("/tasks/:task_id/cancel", h.CancelTask)
 }
 
 // TaskPagination 用于 swagger 展示任务分页信息
@@ -74,6 +75,10 @@ type TaskLogItem struct {
 // TaskLogResponse 任务日志响应
 type TaskLogResponse struct {
 	Items []TaskLogItem `json:"items"`
+}
+
+type cancelTaskRequest struct {
+	Reason string `json:"reason"`
 }
 
 // ListTasks 列出任务
@@ -177,4 +182,40 @@ func (h *TaskHandler) ListLogs(c *gin.Context) {
 		})
 	}
 	utils.Success(c, TaskLogResponse{Items: items})
+}
+
+// CancelTask 取消任务
+// @Summary      取消任务
+// @Description  将任务标记为 CANCELLED（Worker 会轮询 status 并尽快停止）
+// @Tags         Task
+// @Accept       json
+// @Produce      json
+// @Param        task_id  path string true "任务 ID"
+// @Param        body     body cancelTaskRequest false "取消原因"
+// @Success      200      {object} TaskDetailResponse
+// @Router       /tasks/{task_id}/cancel [post]
+func (h *TaskHandler) CancelTask(c *gin.Context) {
+	taskID := c.Param("task_id")
+	var req cancelTaskRequest
+	if err := c.ShouldBindJSON(&req); err != nil && err.Error() != "EOF" {
+		utils.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	task, err := h.taskManager.CancelTaskByExternalID(c.Request.Context(), taskID, req.Reason)
+	if err != nil {
+		utils.Fail(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, TaskDetailResponse{
+		TaskID:       task.TaskID,
+		Type:         task.Type,
+		Status:       task.Status,
+		Trigger:      task.Trigger,
+		Config:       task.ConfigJSON,
+		QueuedAt:     task.QueuedAt,
+		StartedAt:    task.StartedAt,
+		FinishedAt:   task.FinishedAt,
+		LogSummary:   task.LogSummary,
+		DurationSecs: task.DurationSeconds,
+	})
 }

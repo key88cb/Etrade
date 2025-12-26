@@ -94,6 +94,66 @@ func (m *TaskManager) ListTaskLogs(ctx context.Context, taskID uint, limit, offs
 	return logs, err
 }
 
+func (m *TaskManager) AddTaskLog(ctx context.Context, taskInternalID uint, level, message string) error {
+	if taskInternalID == 0 {
+		return errors.New("task id is required")
+	}
+	logItem := &models.TaskLog{
+		TaskID:    taskInternalID,
+		Timestamp: time.Now(),
+		Level:     level,
+		Message:   message,
+	}
+	return m.db.WithContext(ctx).Create(logItem).Error
+}
+
+// CancelTaskByExternalID 将任务标记为 CANCELLED，并写入一条任务日志（用于前端“取消”按钮）。
+// 注意：Worker 会通过轮询 tasks.status 来感知取消并尽快停止。
+func (m *TaskManager) CancelTaskByExternalID(ctx context.Context, externalID, reason string) (*models.Task, error) {
+	if externalID == "" {
+		return nil, errors.New("task id is required")
+	}
+	var task models.Task
+	if err := m.db.WithContext(ctx).Where("task_id = ?", externalID).First(&task).Error; err != nil {
+		return nil, err
+	}
+
+	// 已完成任务不再改状态，直接返回。
+	switch task.Status {
+	case "SUCCESS", "FAILED", "CANCELLED":
+		return &task, nil
+	}
+
+	now := time.Now()
+	duration := int64(0)
+	if task.StartedAt != nil {
+		duration = int64(now.Sub(*task.StartedAt).Seconds())
+	} else if task.QueuedAt != nil {
+		duration = int64(now.Sub(*task.QueuedAt).Seconds())
+	}
+
+	summary := "任务被取消"
+	if reason != "" {
+		summary = fmt.Sprintf("任务被取消: %s", reason)
+	}
+
+	updates := map[string]interface{}{
+		"status":           "CANCELLED",
+		"finished_at":      &now,
+		"duration_seconds": duration,
+		"log_summary":      summary,
+	}
+	if err := m.db.WithContext(ctx).Model(&models.Task{}).Where("id = ?", task.ID).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+	_ = m.AddTaskLog(ctx, task.ID, "INFO", summary)
+
+	if err := m.db.WithContext(ctx).Where("id = ?", task.ID).First(&task).Error; err != nil {
+		return nil, err
+	}
+	return &task, nil
+}
+
 func ptrTime(t time.Time) *time.Time {
 	return &t
 }

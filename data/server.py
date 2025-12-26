@@ -324,6 +324,8 @@ def execute_task(task_type: str, task_data: dict):
                 "batch_id": task_data.get("batch_id"),
                 "overwrite": task_data.get("overwrite", False),
             }
+            if task_data.get("experiment_id") is not None:
+                kwargs["experiment_id"] = task_data.get("experiment_id")
             analyse.run_analyse(task_id=task_id, config_json=json.dumps(kwargs))
             success_msg = "数据分析完成"
             log_msg = "分析数据完成"
@@ -601,8 +603,9 @@ class TaskService(TaskServiceServicer):
             f"batch_id={batch_id}, overwrite={overwrite}"
         )
 
-        # 解析策略 JSON
+        # 解析策略 JSON（允许携带 experiment_id 等元信息）
         strategy_params = {}
+        experiment_id = None
         if strategy_json:
             try:
                 strategy_params = json.loads(strategy_json)
@@ -613,6 +616,8 @@ class TaskService(TaskServiceServicer):
                     task_id=task_id,
                     status=TaskStatus.FAILED,
                 )
+        if isinstance(strategy_params, dict) and "experiment_id" in strategy_params:
+            experiment_id = strategy_params.pop("experiment_id")
 
         # 将任务状态设置为 WAIT
         mark_task_waiting(task_id)
@@ -625,6 +630,8 @@ class TaskService(TaskServiceServicer):
             "overwrite": overwrite,
             "strategy_params": strategy_params,
         }
+        if experiment_id is not None:
+            task_data["experiment_id"] = experiment_id
         try:
             rabbitmq_manager.publish_task("analyse", task_data)
         except Exception as e:

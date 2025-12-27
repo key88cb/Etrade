@@ -1061,9 +1061,34 @@ const openDetails = (record: Opportunity) => {
 };
 
 const onDetailsOpenChange = (open: boolean) => {
-  if (open) renderDetailCharts();
-  else disposeDetailCharts();
+  if (!open) {
+    disposeDetailCharts();
+    return;
+  }
+  nextTick(() => {
+    renderDetailCharts();
+    requestAnimationFrame(() => {
+      riskGaugeChart?.resize();
+      riskRadarChart?.resize();
+      miniPriceChart?.resize();
+    });
+  });
 };
+
+watch(
+  () => selectedOpp.value,
+  () => {
+    if (!detailsOpen.value) return;
+    nextTick(() => {
+      renderDetailCharts();
+      requestAnimationFrame(() => {
+        riskGaugeChart?.resize();
+        riskRadarChart?.resize();
+        miniPriceChart?.resize();
+      });
+    });
+  },
+);
 
 const disposeDetailCharts = () => {
   riskGaugeChart?.dispose();
@@ -1082,6 +1107,7 @@ const renderDetailCharts = async () => {
     const rm = selectedOpp.value.risk_metrics;
     const risk = rm?.risk_score ?? 0;
     riskGaugeChart?.setOption({
+      title: rm ? undefined : { text: '无 risk_metrics', left: 'center', top: '45%', textStyle: { fontSize: 12 } },
       series: [
         {
           type: 'gauge',
@@ -1099,6 +1125,7 @@ const renderDetailCharts = async () => {
         },
       ],
     });
+    riskGaugeChart?.resize();
   }
 
   if (riskRadarRef.value) {
@@ -1110,6 +1137,7 @@ const renderDetailCharts = async () => {
     const volMax = 0.05;
     const slipMax = 5;
     riskRadarChart?.setOption({
+      title: rm ? undefined : { text: '无 risk_metrics', left: 'center', top: '45%', textStyle: { fontSize: 12 } },
       tooltip: {},
       radar: {
         indicator: [
@@ -1130,6 +1158,7 @@ const renderDetailCharts = async () => {
         },
       ],
     });
+    riskRadarChart?.resize();
   }
 
   if (miniPriceRef.value) {
@@ -1138,6 +1167,7 @@ const renderDetailCharts = async () => {
     if (!Number.isFinite(bt)) {
       miniPriceChart?.clear();
       miniPriceChart?.setOption({ title: { text: '无 block_time，无法加载价格上下文', left: 'center' } });
+      miniPriceChart?.resize();
       return;
     }
     const start = bt - 15 * 60 * 1000;
@@ -1147,6 +1177,12 @@ const renderDetailCharts = async () => {
       const payload = data?.data ?? {};
       const uniswap = (payload.uniswap ?? []).map((p: any) => [p[0], Number(p[1])]);
       const binance = (payload.binance ?? []).map((p: any) => [p[0], Number(p[1])]);
+      if (!uniswap.length && !binance.length) {
+        miniPriceChart?.clear();
+        miniPriceChart?.setOption({ title: { text: '该时间范围无聚合价格数据', left: 'center' } });
+        miniPriceChart?.resize();
+        return;
+      }
       miniPriceChart?.setOption({
         tooltip: { trigger: 'axis' },
         legend: { top: 0, data: ['Uniswap', 'Binance'] },
@@ -1159,9 +1195,11 @@ const renderDetailCharts = async () => {
           { name: 'Binance', type: 'line', showSymbol: false, data: binance, lineStyle: { width: 1.5 } },
         ],
       });
+      miniPriceChart?.resize();
     } catch {
       miniPriceChart?.clear();
       miniPriceChart?.setOption({ title: { text: '价格数据加载失败', left: 'center' } });
+      miniPriceChart?.resize();
     }
   }
 };

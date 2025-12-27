@@ -7,6 +7,8 @@ import {
   BarChartOutlined,
   DatabaseOutlined,
   FileTextOutlined,
+  LineChartOutlined,
+  PlayCircleOutlined,
   ProfileOutlined,
 } from '@ant-design/icons-vue';
 import { getThemeMode, isDarkMode, setThemeMode } from '../utils/theme';
@@ -70,6 +72,9 @@ const navigate = (key: string) => {
 const onMenuClick = (e: any) => {
   navigate(String(e?.key ?? ''));
 };
+
+const goPriceComparison = () => router.push('/app/comparison');
+const goRunTask = () => router.push('/app/templates');
 
 const configTheme = computed(() => ({
   algorithm: isDark.value ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
@@ -165,6 +170,26 @@ const secondaryButtonClass = computed(() =>
           <div class="text-sm" :class="headerSubtleClass">任务 → 批次 → 机会 → 详情 → 报告</div>
           <div class="flex items-center gap-3">
             <div class="text-xs" :class="headerSubtleClass">{{ route.meta?.title ?? route.name }}</div>
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-md text-sm transition-colors inline-flex items-center gap-2"
+              :class="secondaryButtonClass"
+              @click="goPriceComparison"
+              title="打开价格对比"
+            >
+              <LineChartOutlined />
+              价格对比
+            </button>
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-md text-sm transition-colors inline-flex items-center gap-2"
+              :class="secondaryButtonClass"
+              @click="goRunTask"
+              title="到模板页运行任务"
+            >
+              <PlayCircleOutlined />
+              运行任务
+            </button>
             <button
               type="button"
               class="px-3 py-1.5 rounded-md text-sm transition-colors inline-flex items-center gap-2"

@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import * as echarts from 'echarts';
 import api, { type TemplatePayload } from '../api';
+import { useRouter } from 'vue-router';
 
 interface TemplateItem {
   id: number;
@@ -11,6 +12,10 @@ interface TemplateItem {
   created_at?: string;
   updated_at?: string;
 }
+
+type PipelineTaskType = 'collect_binance' | 'collect_uniswap' | 'process_prices' | 'analyse';
+
+const router = useRouter();
 
 const templates = ref<TemplateItem[]>([]);
 const loading = ref(false);
@@ -23,6 +28,14 @@ const form = reactive<TemplatePayload>({
   config: {},
 });
 const errorMessage = ref('');
+const quickMessage = ref('');
+const quickLastTaskId = ref<string>('');
+const quickLoading = reactive<Record<PipelineTaskType, boolean>>({
+  collect_binance: false,
+  collect_uniswap: false,
+  process_prices: false,
+  analyse: false,
+});
 
 const chartRef = ref<HTMLDivElement | null>(null);
 let chart: echarts.ECharts | null = null;
@@ -36,6 +49,28 @@ const typeCounts = computed(() => {
   }
   return counts;
 });
+
+const templatesByType = computed<Record<PipelineTaskType, TemplateItem[]>>(() => {
+  const base: Record<PipelineTaskType, TemplateItem[]> = {
+    collect_binance: [],
+    collect_uniswap: [],
+    process_prices: [],
+    analyse: [],
+  };
+  for (const t of templates.value) {
+    if (t.task_type in base) {
+      base[t.task_type as PipelineTaskType].push(t);
+    }
+  }
+  return base;
+});
+
+const templateOptionsByType = computed(() => ({
+  collect_binance: templatesByType.value.collect_binance.map((t) => ({ label: `#${t.id} · ${t.name}`, value: t.id })),
+  collect_uniswap: templatesByType.value.collect_uniswap.map((t) => ({ label: `#${t.id} · ${t.name}`, value: t.id })),
+  process_prices: templatesByType.value.process_prices.map((t) => ({ label: `#${t.id} · ${t.name}`, value: t.id })),
+  analyse: templatesByType.value.analyse.map((t) => ({ label: `#${t.id} · ${t.name}`, value: t.id })),
+}));
 
 const resetForm = () => {
   form.name = '';
@@ -111,6 +146,131 @@ const runTemplate = async (id: number) => {
   }
 };
 
+const toUnixSeconds = (value: string): number | null => {
+  if (!value) return null;
+  const d = new Date(value);
+  const t = d.getTime();
+  if (!Number.isFinite(t)) return null;
+  return Math.floor(t / 1000);
+};
+
+const toISOZ = (value: string): string | null => {
+  if (!value) return null;
+  const d = new Date(value);
+  const t = d.getTime();
+  if (!Number.isFinite(t)) return null;
+  return d.toISOString();
+};
+
+const quickSelectedTemplateId = reactive<Record<PipelineTaskType, number | null>>({
+  collect_binance: null,
+  collect_uniswap: null,
+  process_prices: null,
+  analyse: null,
+});
+
+const quickParams = reactive({
+  collect_binance: {
+    csv_path: '/data/binance_aggTrades_ETHUSDT.csv',
+    import_percentage: 100,
+    chunk_size: 1000000,
+  },
+  collect_uniswap: {
+    pool_address: '',
+    start_time: '',
+    end_time: '',
+  },
+  process_prices: {
+    start_time: '',
+    end_time: '',
+    aggregation_interval: '5m',
+    overwrite: true,
+  },
+  analyse: {
+    batch_id: 1,
+    overwrite: false,
+    profit_threshold: 0.5,
+    time_delay_seconds: 15,
+    initial_investment: 10000,
+    start_time: '',
+    end_time: '',
+  },
+});
+
+const pickTemplateId = (taskType: PipelineTaskType): number | null => {
+  const selected = quickSelectedTemplateId[taskType];
+  if (selected) return selected;
+  const list = templatesByType.value[taskType];
+  return list.length ? list[0]!.id : null;
+};
+
+const goTasks = () => router.push('/app/tasks');
+
+const runQuick = async (taskType: PipelineTaskType) => {
+  quickMessage.value = '';
+  quickLastTaskId.value = '';
+
+  const templateId = pickTemplateId(taskType);
+  if (!templateId) {
+    quickMessage.value = `未找到 ${taskType} 的模板，请先新建一个对应 task_type 的模板。`;
+    return;
+  }
+
+  quickLoading[taskType] = true;
+  try {
+    let overrides: Record<string, unknown> = {};
+
+    if (taskType === 'collect_binance') {
+      overrides = {
+        csv_path: quickParams.collect_binance.csv_path,
+        import_percentage: quickParams.collect_binance.import_percentage,
+        chunk_size: quickParams.collect_binance.chunk_size,
+      };
+    } else if (taskType === 'collect_uniswap') {
+      const startTs = toUnixSeconds(quickParams.collect_uniswap.start_time);
+      const endTs = toUnixSeconds(quickParams.collect_uniswap.end_time);
+      overrides = {
+        pool_address: quickParams.collect_uniswap.pool_address,
+        start_ts: startTs ?? 0,
+        end_ts: endTs ?? 0,
+      };
+    } else if (taskType === 'process_prices') {
+      const startISO = toISOZ(quickParams.process_prices.start_time);
+      const endISO = toISOZ(quickParams.process_prices.end_time);
+      overrides = {
+        start_date: startISO ?? undefined,
+        end_date: endISO ?? undefined,
+        aggregation_interval: quickParams.process_prices.aggregation_interval,
+        overwrite: quickParams.process_prices.overwrite,
+      };
+    } else if (taskType === 'analyse') {
+      const startISO = toISOZ(quickParams.analyse.start_time);
+      const endISO = toISOZ(quickParams.analyse.end_time);
+      const strategy: Record<string, unknown> = {
+        profit_threshold: quickParams.analyse.profit_threshold,
+        time_delay_seconds: quickParams.analyse.time_delay_seconds,
+        initial_investment: quickParams.analyse.initial_investment,
+      };
+      if (startISO) strategy.start = startISO;
+      if (endISO) strategy.end = endISO;
+      overrides = {
+        batch_id: quickParams.analyse.batch_id,
+        overwrite: quickParams.analyse.overwrite,
+        strategy,
+      };
+    }
+
+    const { data } = await api.runTemplate(templateId, { overrides, trigger: 'quick_run' });
+    const taskId = data?.data?.task_id ?? data?.task_id;
+    quickLastTaskId.value = String(taskId ?? '');
+    quickMessage.value = taskId ? `已触发任务：${taskId}` : '已触发任务';
+  } catch (error: any) {
+    quickMessage.value = error?.message ?? '运行失败';
+  } finally {
+    quickLoading[taskType] = false;
+  }
+};
+
 const formattedConfig = computed(() => JSON.stringify(form.config, null, 2));
 
 const handleConfigChange = (event: Event) => {
@@ -181,6 +341,13 @@ onBeforeUnmount(() => {
     <div v-if="runMessage" class="bg-blue-50 text-blue-700 text-sm rounded p-3">
       {{ runMessage }}
     </div>
+    <div v-if="quickMessage" class="bg-blue-50 text-blue-700 text-sm rounded p-3 flex items-center justify-between gap-3">
+      <div>{{ quickMessage }}</div>
+      <div v-if="quickLastTaskId" class="flex items-center gap-3">
+        <span class="text-xs text-[#57606a] dark:text-[#7d8590] font-mono">{{ quickLastTaskId }}</span>
+        <button type="button" class="text-sm text-blue-600 hover:underline" @click="goTasks">去任务中心</button>
+      </div>
+    </div>
 
     <a-row :gutter="16">
       <a-col :xs="24" :sm="8" :lg="6">
@@ -219,6 +386,202 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div ref="chartRef" style="height: 260px;"></div>
+    </div>
+
+    <div class="bg-white dark:bg-[#161b22] rounded-lg shadow border border-[#d0d7de] dark:border-[#30363d] p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <div class="text-sm font-medium text-[#24292f] dark:text-[#e6edf3]">快捷运行</div>
+          <div class="text-xs text-[#57606a] dark:text-[#7d8590] mt-1">
+            选择一个模板并填写参数（overrides），点击运行即可创建任务。
+          </div>
+        </div>
+        <button type="button" class="text-sm text-blue-600 hover:underline" @click="goTasks">任务中心</button>
+      </div>
+
+      <a-tabs size="small">
+        <a-tab-pane key="collect_binance" tab="collect_binance">
+          <a-row :gutter="12">
+            <a-col :xs="24" :md="10">
+              <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">模板</div>
+              <a-select
+                v-model:value="quickSelectedTemplateId.collect_binance"
+                :options="templateOptionsByType.collect_binance"
+                placeholder="选择 collect_binance 模板"
+                style="width: 100%"
+              />
+            </a-col>
+            <a-col :xs="24" :md="14">
+              <a-row :gutter="12">
+                <a-col :xs="24" :sm="10">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">csv_path（可选）</div>
+                  <a-input v-model:value="quickParams.collect_binance.csv_path" placeholder="/data/xxx.csv" />
+                </a-col>
+                <a-col :xs="12" :sm="7">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">import_percentage</div>
+                  <a-input-number v-model:value="quickParams.collect_binance.import_percentage" :min="1" :max="100" style="width: 100%" />
+                </a-col>
+                <a-col :xs="12" :sm="7">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">chunk_size</div>
+                  <a-input-number v-model:value="quickParams.collect_binance.chunk_size" :min="1" style="width: 100%" />
+                </a-col>
+              </a-row>
+            </a-col>
+          </a-row>
+          <div class="mt-3">
+            <a-button type="primary" :loading="quickLoading.collect_binance" @click="runQuick('collect_binance')">
+              运行 collect_binance
+            </a-button>
+          </div>
+        </a-tab-pane>
+
+        <a-tab-pane key="collect_uniswap" tab="collect_uniswap">
+          <a-row :gutter="12">
+            <a-col :xs="24" :md="10">
+              <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">模板</div>
+              <a-select
+                v-model:value="quickSelectedTemplateId.collect_uniswap"
+                :options="templateOptionsByType.collect_uniswap"
+                placeholder="选择 collect_uniswap 模板"
+                style="width: 100%"
+              />
+              <div class="text-xs text-[#57606a] dark:text-[#7d8590] mt-3 mb-1">pool_address</div>
+              <a-input v-model:value="quickParams.collect_uniswap.pool_address" placeholder="0x..." />
+            </a-col>
+            <a-col :xs="24" :md="14">
+              <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-2">时间范围（可选，用于生成 start_ts/end_ts）</div>
+              <a-row :gutter="12">
+                <a-col :xs="24" :sm="12">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">start</div>
+                  <input v-model="quickParams.collect_uniswap.start_time" type="datetime-local" class="w-full border rounded px-3 py-1.5 text-sm bg-white dark:bg-[#0d1117] border-[#d0d7de] dark:border-[#30363d]" />
+                </a-col>
+                <a-col :xs="24" :sm="12">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">end</div>
+                  <input v-model="quickParams.collect_uniswap.end_time" type="datetime-local" class="w-full border rounded px-3 py-1.5 text-sm bg-white dark:bg-[#0d1117] border-[#d0d7de] dark:border-[#30363d]" />
+                </a-col>
+              </a-row>
+            </a-col>
+          </a-row>
+          <div class="mt-3">
+            <a-button type="primary" :loading="quickLoading.collect_uniswap" @click="runQuick('collect_uniswap')">
+              运行 collect_uniswap
+            </a-button>
+          </div>
+        </a-tab-pane>
+
+        <a-tab-pane key="process_prices" tab="process_prices">
+          <a-row :gutter="12">
+            <a-col :xs="24" :md="10">
+              <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">模板</div>
+              <a-select
+                v-model:value="quickSelectedTemplateId.process_prices"
+                :options="templateOptionsByType.process_prices"
+                placeholder="选择 process_prices 模板"
+                style="width: 100%"
+              />
+            </a-col>
+            <a-col :xs="24" :md="14">
+              <a-row :gutter="12">
+                <a-col :xs="24" :sm="8">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">aggregation_interval</div>
+                  <a-select
+                    v-model:value="quickParams.process_prices.aggregation_interval"
+                    style="width: 100%"
+                    :options="[
+                      { label: '1m', value: '1m' },
+                      { label: '5m', value: '5m' },
+                      { label: '15m', value: '15m' },
+                      { label: '1h', value: '1h' },
+                    ]"
+                  />
+                </a-col>
+                <a-col :xs="12" :sm="8">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">overwrite</div>
+                  <div class="pt-1">
+                    <a-switch v-model:checked="quickParams.process_prices.overwrite" />
+                  </div>
+                </a-col>
+              </a-row>
+              <div class="text-xs text-[#57606a] dark:text-[#7d8590] mt-3 mb-2">时间范围（可选，会被转成 RFC3339）</div>
+              <a-row :gutter="12">
+                <a-col :xs="24" :sm="12">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">start</div>
+                  <input v-model="quickParams.process_prices.start_time" type="datetime-local" class="w-full border rounded px-3 py-1.5 text-sm bg-white dark:bg-[#0d1117] border-[#d0d7de] dark:border-[#30363d]" />
+                </a-col>
+                <a-col :xs="24" :sm="12">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">end</div>
+                  <input v-model="quickParams.process_prices.end_time" type="datetime-local" class="w-full border rounded px-3 py-1.5 text-sm bg-white dark:bg-[#0d1117] border-[#d0d7de] dark:border-[#30363d]" />
+                </a-col>
+              </a-row>
+            </a-col>
+          </a-row>
+          <div class="mt-3">
+            <a-button type="primary" :loading="quickLoading.process_prices" @click="runQuick('process_prices')">
+              运行 process_prices
+            </a-button>
+          </div>
+        </a-tab-pane>
+
+        <a-tab-pane key="analyse" tab="analyse">
+          <a-row :gutter="12">
+            <a-col :xs="24" :md="10">
+              <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">模板</div>
+              <a-select
+                v-model:value="quickSelectedTemplateId.analyse"
+                :options="templateOptionsByType.analyse"
+                placeholder="选择 analyse 模板"
+                style="width: 100%"
+              />
+              <a-row :gutter="12" class="mt-3">
+                <a-col :xs="12">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">batch_id</div>
+                  <a-input-number v-model:value="quickParams.analyse.batch_id" :min="1" style="width: 100%" />
+                </a-col>
+                <a-col :xs="12">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">overwrite</div>
+                  <div class="pt-1">
+                    <a-switch v-model:checked="quickParams.analyse.overwrite" />
+                  </div>
+                </a-col>
+              </a-row>
+            </a-col>
+            <a-col :xs="24" :md="14">
+              <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-2">策略参数（strategy）</div>
+              <a-row :gutter="12">
+                <a-col :xs="12" :sm="8">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">profit_threshold</div>
+                  <a-input-number v-model:value="quickParams.analyse.profit_threshold" :min="0" :step="0.1" style="width: 100%" />
+                </a-col>
+                <a-col :xs="12" :sm="8">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">time_delay_seconds</div>
+                  <a-input-number v-model:value="quickParams.analyse.time_delay_seconds" :min="0" :step="1" style="width: 100%" />
+                </a-col>
+                <a-col :xs="24" :sm="8">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">initial_investment</div>
+                  <a-input-number v-model:value="quickParams.analyse.initial_investment" :min="0" :step="100" style="width: 100%" />
+                </a-col>
+              </a-row>
+
+              <div class="text-xs text-[#57606a] dark:text-[#7d8590] mt-3 mb-2">时间范围（可选，写入 strategy.start / strategy.end）</div>
+              <a-row :gutter="12">
+                <a-col :xs="24" :sm="12">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">start</div>
+                  <input v-model="quickParams.analyse.start_time" type="datetime-local" class="w-full border rounded px-3 py-1.5 text-sm bg-white dark:bg-[#0d1117] border-[#d0d7de] dark:border-[#30363d]" />
+                </a-col>
+                <a-col :xs="24" :sm="12">
+                  <div class="text-xs text-[#57606a] dark:text-[#7d8590] mb-1">end</div>
+                  <input v-model="quickParams.analyse.end_time" type="datetime-local" class="w-full border rounded px-3 py-1.5 text-sm bg-white dark:bg-[#0d1117] border-[#d0d7de] dark:border-[#30363d]" />
+                </a-col>
+              </a-row>
+            </a-col>
+          </a-row>
+          <div class="mt-3">
+            <a-button type="primary" :loading="quickLoading.analyse" @click="runQuick('analyse')">
+              运行 analyse
+            </a-button>
+          </div>
+        </a-tab-pane>
+      </a-tabs>
     </div>
 
     <div class="bg-white dark:bg-[#161b22] rounded-lg shadow border border-[#d0d7de] dark:border-[#30363d]">

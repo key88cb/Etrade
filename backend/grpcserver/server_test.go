@@ -11,6 +11,8 @@ import (
 	"backend/testutil"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestServerRPCsPersistTasks(t *testing.T) {
@@ -105,4 +107,20 @@ func jsonNumberAsInt(v interface{}) int {
 		}
 	}
 	return 0
+}
+
+func TestCreateTaskReturnsInternalOnManagerError(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	srv := New(service.NewTaskManager(db), "grpc-trigger")
+	_, err := srv.createTask(context.Background(), "", "", map[string]interface{}{})
+	require.Error(t, err)
+	st, ok := status.FromError(err)
+	require.True(t, ok)
+	require.Equal(t, codes.Internal, st.Code())
+}
+
+func TestRunReturnsListenError(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	err := Run(Config{Port: "bad-port"}, service.NewTaskManager(db))
+	require.Error(t, err)
 }

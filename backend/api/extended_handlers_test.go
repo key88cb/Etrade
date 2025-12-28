@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"backend/models"
 	"backend/service"
@@ -217,12 +218,28 @@ func TestReportHandlerEndpoints(t *testing.T) {
 	db := testutil.NewInMemoryDB(t)
 	reportSvc := service.NewReportService(db)
 	handler := NewReportHandler(reportSvc)
+	ctx := context.Background()
 
 	invalidPayload := strings.NewReader(`{"batch_id":0}`)
 	_, resp := invokeJSONHandler(t, handler.CreateReport, http.MethodPost, "/reports", invalidPayload, nil)
 	require.Equal(t, http.StatusBadRequest, resp.Code)
 
-	ctx := context.Background()
+	validPayload := strings.NewReader(`{"batch_id":9,"format":"pdf"}`)
+	_, createResp := invokeJSONHandler(t, handler.CreateReport, http.MethodPost, "/reports", validPayload, nil)
+	require.Equal(t, http.StatusOK, createResp.Code)
+
+	var createdReport models.Report
+	decodeData(t, createResp.Data, &createdReport)
+	require.NotZero(t, createdReport.ID)
+
+	require.Eventually(t, func() bool {
+		var refreshed models.Report
+		if err := db.WithContext(ctx).First(&refreshed, createdReport.ID).Error; err != nil {
+			return false
+		}
+		return refreshed.Status == "SUCCESS"
+	}, 5*time.Second, 100*time.Millisecond)
+
 	report, err := reportSvc.CreateReport(ctx, 7, 1, "pdf", "")
 	require.NoError(t, err)
 

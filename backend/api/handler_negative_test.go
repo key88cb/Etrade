@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func newTemplateHandlerForTest(t *testing.T) *TemplateHandler {
@@ -32,6 +33,13 @@ func newGinContext(method, path, payload string) (*gin.Context, *httptest.Respon
 	}
 	c.Request = req
 	return c, recorder
+}
+
+func closeSQLDB(t *testing.T, gdb *gorm.DB) {
+	t.Helper()
+	sqlDB, err := gdb.DB()
+	require.NoError(t, err)
+	require.NoError(t, sqlDB.Close())
 }
 
 func TestTemplateHandlerCreateTemplateValidationError(t *testing.T) {
@@ -280,4 +288,169 @@ func TestExperimentHandlerRunTemplateServiceError(t *testing.T) {
 	handler.RunTemplate(c)
 
 	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestBatchHandlerListBatchesServiceError(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	handler := NewBatchHandler(service.NewBatchService(db))
+	closeSQLDB(t, db)
+
+	c, w := newGinContext(http.MethodGet, "/batches", "")
+	handler.ListBatches(c)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestBatchHandlerCreateBatchServiceError(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	handler := NewBatchHandler(service.NewBatchService(db))
+	closeSQLDB(t, db)
+
+	c, w := newGinContext(http.MethodPost, "/batches", `{"name":"batch","description":"desc"}`)
+	handler.CreateBatch(c)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestBatchHandlerUpdateBatchServiceError(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	handler := NewBatchHandler(service.NewBatchService(db))
+	closeSQLDB(t, db)
+
+	c, w := newGinContext(http.MethodPut, "/batches/1", `{"name":"batch","description":"desc"}`)
+	c.Params = gin.Params{{Key: "id", Value: "1"}}
+	handler.UpdateBatch(c)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestTemplateHandlerListTemplatesServiceError(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	taskManager := service.NewTaskManager(db)
+	handler := NewTemplateHandler(service.NewTemplateService(db, taskManager, nil), taskManager)
+	closeSQLDB(t, db)
+
+	c, w := newGinContext(http.MethodGet, "/templates", "")
+	handler.ListTemplates(c)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestTemplateHandlerCreateTemplateServiceError(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	taskManager := service.NewTaskManager(db)
+	handler := NewTemplateHandler(service.NewTemplateService(db, taskManager, nil), taskManager)
+	closeSQLDB(t, db)
+
+	c, w := newGinContext(http.MethodPost, "/templates", `{"name":"n","task_type":"analyse"}`)
+	handler.CreateTemplate(c)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestTemplateHandlerDeleteTemplateServiceError(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	taskManager := service.NewTaskManager(db)
+	handler := NewTemplateHandler(service.NewTemplateService(db, taskManager, nil), taskManager)
+	closeSQLDB(t, db)
+
+	c, w := newGinContext(http.MethodDelete, "/templates/1", "")
+	c.Params = gin.Params{{Key: "id", Value: "1"}}
+	handler.DeleteTemplate(c)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestExperimentHandlerServiceErrors(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	taskManager := service.NewTaskManager(db)
+	templateSvc := service.NewTemplateService(db, taskManager, nil)
+	experimentSvc := service.NewExperimentService(db, templateSvc, taskManager)
+	handler := NewExperimentHandler(experimentSvc)
+
+	_, err := experimentSvc.CreateExperiment(context.Background(), 1, "desc")
+	require.NoError(t, err)
+
+	closeSQLDB(t, db)
+
+	t.Run("ListExperiments", func(t *testing.T) {
+		c, w := newGinContext(http.MethodGet, "/experiments", "")
+		handler.ListExperiments(c)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+
+	t.Run("CreateExperiment", func(t *testing.T) {
+		c, w := newGinContext(http.MethodPost, "/experiments", `{"batch_id":1,"description":"d"}`)
+		handler.CreateExperiment(c)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+
+	t.Run("GetExperiment", func(t *testing.T) {
+		c, w := newGinContext(http.MethodGet, "/experiments/1", "")
+		c.Params = gin.Params{{Key: "id", Value: "1"}}
+		handler.GetExperiment(c)
+		require.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	t.Run("ListRuns", func(t *testing.T) {
+		c, w := newGinContext(http.MethodGet, "/experiments/1/runs", "")
+		c.Params = gin.Params{{Key: "id", Value: "1"}}
+		handler.ListRuns(c)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+
+	t.Run("RunTemplate", func(t *testing.T) {
+		c, w := newGinContext(http.MethodPost, "/experiments/1/runs", `{"template_id":1}`)
+		c.Params = gin.Params{{Key: "id", Value: "1"}}
+		handler.RunTemplate(c)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+}
+
+func TestTaskHandlerListTasksServiceError(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	h := NewTaskHandler(service.NewTaskManager(db))
+	closeSQLDB(t, db)
+
+	c, w := newGinContext(http.MethodGet, "/tasks", "")
+	h.ListTasks(c)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestTaskHandlerCancelTaskServiceError(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	manager := service.NewTaskManager(db)
+	h := NewTaskHandler(manager)
+	_, err := manager.CreateTask(context.Background(), "collect_binance", "task-cancel", "manual", service.EncodeConfig(nil))
+	require.NoError(t, err)
+	closeSQLDB(t, db)
+
+	c, w := newGinContext(http.MethodPost, "/tasks/task-cancel/cancel", `{"reason":"stop"}`)
+	c.Params = gin.Params{{Key: "task_id", Value: "task-cancel"}}
+	h.CancelTask(c)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestReportHandlerServiceErrors(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	reportSvc := service.NewReportService(db)
+	handler := NewReportHandler(reportSvc)
+
+	report, err := reportSvc.CreateReport(context.Background(), 1, 0, "pdf", "")
+	require.NoError(t, err)
+
+	closeSQLDB(t, db)
+
+	t.Run("ListReports", func(t *testing.T) {
+		c, w := newGinContext(http.MethodGet, "/reports", "")
+		handler.ListReports(c)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+
+	t.Run("CreateReport", func(t *testing.T) {
+		c, w := newGinContext(http.MethodPost, "/reports", `{"batch_id":1,"format":"pdf"}`)
+		handler.CreateReport(c)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
+	})
+
+	t.Run("DeleteReport", func(t *testing.T) {
+		c, w := newGinContext(http.MethodDelete, fmt.Sprintf("/reports/%d", report.ID), "")
+		c.Params = gin.Params{{Key: "id", Value: fmt.Sprintf("%d", report.ID)}}
+		handler.DeleteReport(c)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
+	})
 }

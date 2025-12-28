@@ -38,3 +38,7 @@ dist-ssr
 #py
 __pycache__/
 .pytest_cache/
+
+# Go tooling artifacts
+backend/coverage
+backend/service/service

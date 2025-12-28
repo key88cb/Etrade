@@ -1,6 +1,10 @@
 package models
 
-import "gorm.io/datatypes"
+import (
+	"time"
+
+	"gorm.io/datatypes"
+)
 
 // ArbitrageOpportunity 对应于 arbitrage_opportunities 表
 type ArbitrageOpportunity struct {
@@ -13,6 +17,8 @@ type ArbitrageOpportunity struct {
 	ProfitUSDT      float64           `json:"profit_usdt" gorm:"not null"`
 	DetailsJSON     datatypes.JSONMap `json:"details,omitempty" gorm:"type:jsonb" swaggertype:"object"`
 	RiskMetricsJSON datatypes.JSONMap `json:"risk_metrics,omitempty" gorm:"type:jsonb" swaggertype:"object"`
+	CreatedAt       time.Time         `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt       time.Time         `json:"updated_at" gorm:"autoUpdateTime"`
 }
 
 // PaginationData 定义分页响应的结构

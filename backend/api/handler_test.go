@@ -97,3 +97,53 @@ func TestGetPriceComparisonDataHandlerReturnsSeries(t *testing.T) {
 	require.Len(t, resp.Data["binance"], 1)
 	require.Len(t, resp.Data["uniswap"], 1)
 }
+
+func TestGetOpportunitiesRejectsInvalidOrder(t *testing.T) {
+	h, _ := newTestHandler(t)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/opportunities?order=sideways", nil)
+
+	h.GetOpportunities(c)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestGetPriceComparisonDataHandlerRejectsBadTimestamp(t *testing.T) {
+	h, _ := newTestHandler(t)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/price-comparison?startTime=abc&endTime=123", nil)
+
+	h.GetPriceComparisonData(c)
+
+	require.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestGetOpportunitiesHandlesServiceError(t *testing.T) {
+	h, svc := newTestHandler(t)
+	sqlDB, err := svc.DB().DB()
+	require.NoError(t, err)
+	require.NoError(t, sqlDB.Close())
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/opportunities", nil)
+
+	h.GetOpportunities(c)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestGetPriceComparisonHandlesServiceError(t *testing.T) {
+	h, svc := newTestHandler(t)
+	sqlDB, err := svc.DB().DB()
+	require.NoError(t, err)
+	require.NoError(t, sqlDB.Close())
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/price-comparison?startTime=1&endTime=2", nil)
+
+	h.GetPriceComparisonData(c)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}

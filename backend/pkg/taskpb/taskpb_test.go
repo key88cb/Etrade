@@ -15,10 +15,16 @@ import (
 
 type fakeConn struct {
 	lastMethod string
+	lastOpts   []grpc.CallOption
+	errors     map[string]error
 }
 
 func (f *fakeConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
 	f.lastMethod = method
+	f.lastOpts = append([]grpc.CallOption(nil), opts...)
+	if err, ok := f.errors[method]; ok {
+		return err
+	}
 	return nil
 }
 
@@ -49,6 +55,72 @@ func TestTaskServiceClientInvokesMethods(t *testing.T) {
 	_, err = client.CollectBinanceByDate(context.Background(), &CollectBinanceByDateRequest{})
 	require.NoError(t, err)
 	require.Equal(t, TaskService_CollectBinanceByDate_FullMethodName, conn.lastMethod)
+}
+
+func TestTaskServiceClientPropagatesErrorsAndOptions(t *testing.T) {
+	boom := errors.New("invoke failure")
+	conn := &fakeConn{errors: map[string]error{
+		TaskService_ProcessPrices_FullMethodName: boom,
+	}}
+	client := NewTaskServiceClient(conn)
+	opts := []grpc.CallOption{grpc.WaitForReady(true)}
+	resp, err := client.ProcessPrices(context.Background(), &ProcessPricesRequest{TaskId: "pp"}, opts...)
+	require.Nil(t, resp)
+	require.ErrorIs(t, err, boom)
+	require.Equal(t, TaskService_ProcessPrices_FullMethodName, conn.lastMethod)
+	require.Len(t, conn.lastOpts, len(opts)+1)
+}
+
+func TestTaskServiceClientErrorBranches(t *testing.T) {
+	testCases := []struct {
+		name   string
+		method string
+		call   func(TaskServiceClient) error
+	}{
+		{
+			name:   "CollectBinance",
+			method: TaskService_CollectBinance_FullMethodName,
+			call: func(client TaskServiceClient) error {
+				_, err := client.CollectBinance(context.Background(), &CollectBinanceRequest{TaskId: "cb"})
+				return err
+			},
+		},
+		{
+			name:   "CollectBinanceByDate",
+			method: TaskService_CollectBinanceByDate_FullMethodName,
+			call: func(client TaskServiceClient) error {
+				_, err := client.CollectBinanceByDate(context.Background(), &CollectBinanceByDateRequest{TaskId: "cbd"})
+				return err
+			},
+		},
+		{
+			name:   "CollectUniswap",
+			method: TaskService_CollectUniswap_FullMethodName,
+			call: func(client TaskServiceClient) error {
+				_, err := client.CollectUniswap(context.Background(), &CollectUniswapRequest{TaskId: "cu"})
+				return err
+			},
+		},
+		{
+			name:   "Analyse",
+			method: TaskService_Analyse_FullMethodName,
+			call: func(client TaskServiceClient) error {
+				_, err := client.Analyse(context.Background(), &AnalyseRequest{TaskId: "an"})
+				return err
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			expect := errors.New("call failed: " + tc.name)
+			conn := &fakeConn{errors: map[string]error{tc.method: expect}}
+			client := NewTaskServiceClient(conn)
+			err := tc.call(client)
+			require.ErrorIs(t, err, expect)
+			require.Equal(t, tc.method, conn.lastMethod)
+		})
+	}
 }
 
 type noopServer struct {
@@ -201,12 +273,93 @@ func TestTaskServiceHandlersWithoutInterceptor(t *testing.T) {
 	}
 }
 
+func TestTaskServiceHandlersWithInterceptor(t *testing.T) {
+	srv := &spyTaskServer{}
+	ctx := context.Background()
+	testCases := []struct {
+		name       string
+		handler    func(interface{}, context.Context, func(interface{}) error, grpc.UnaryServerInterceptor) (interface{}, error)
+		prep       func(interface{}) error
+		fullMethod string
+	}{
+		{
+			name:    "CollectBinanceByDate",
+			handler: _TaskService_CollectBinanceByDate_Handler,
+			prep: func(v interface{}) error {
+				v.(*CollectBinanceByDateRequest).TaskId = "cbd"
+				return nil
+			},
+			fullMethod: TaskService_CollectBinanceByDate_FullMethodName,
+		},
+		{
+			name:    "CollectUniswap",
+			handler: _TaskService_CollectUniswap_Handler,
+			prep: func(v interface{}) error {
+				v.(*CollectUniswapRequest).TaskId = "cu"
+				return nil
+			},
+			fullMethod: TaskService_CollectUniswap_FullMethodName,
+		},
+		{
+			name:    "ProcessPrices",
+			handler: _TaskService_ProcessPrices_Handler,
+			prep: func(v interface{}) error {
+				v.(*ProcessPricesRequest).TaskId = "pp"
+				return nil
+			},
+			fullMethod: TaskService_ProcessPrices_FullMethodName,
+		},
+		{
+			name:    "Analyse",
+			handler: _TaskService_Analyse_Handler,
+			prep: func(v interface{}) error {
+				v.(*AnalyseRequest).TaskId = "an"
+				return nil
+			},
+			fullMethod: TaskService_Analyse_FullMethodName,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			srv.lastMethod = ""
+			srv.lastReq = nil
+			resp, err := tc.handler(srv, ctx, tc.prep, func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+				called = true
+				require.Equal(t, tc.fullMethod, info.FullMethod)
+				require.Equal(t, srv, info.Server)
+				return handler(ctx, req)
+			})
+			require.NoError(t, err)
+			require.True(t, called)
+			require.Equal(t, tc.name, srv.lastMethod)
+			require.NotNil(t, resp)
+		})
+	}
+}
+
 func TestTaskServiceHandlerDecoderError(t *testing.T) {
 	decErr := errors.New("boom")
-	_, err := _TaskService_CollectBinance_Handler(&spyTaskServer{}, context.Background(), func(interface{}) error {
-		return decErr
-	}, nil)
-	require.ErrorIs(t, err, decErr)
+	handlers := []struct {
+		name    string
+		handler func(interface{}, context.Context, func(interface{}) error, grpc.UnaryServerInterceptor) (interface{}, error)
+	}{
+		{"CollectBinance", _TaskService_CollectBinance_Handler},
+		{"CollectBinanceByDate", _TaskService_CollectBinanceByDate_Handler},
+		{"CollectUniswap", _TaskService_CollectUniswap_Handler},
+		{"ProcessPrices", _TaskService_ProcessPrices_Handler},
+		{"Analyse", _TaskService_Analyse_Handler},
+	}
+
+	for _, tc := range handlers {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.handler(&spyTaskServer{}, context.Background(), func(interface{}) error {
+				return decErr
+			}, nil)
+			require.ErrorIs(t, err, decErr)
+		})
+	}
 }
 
 func TestTaskServiceServiceDescMetadata(t *testing.T) {
@@ -398,6 +551,84 @@ func TestTaskStatusDescriptors(t *testing.T) {
 	require.Contains(t, File_task_proto.Path(), "task.proto")
 	require.GreaterOrEqual(t, File_task_proto.Messages().Len(), 6)
 	require.Equal(t, protoreflect.FullName("task.v1.TaskStatus"), File_task_proto.Enums().Get(0).FullName())
+}
+
+func TestTaskProtoResetsAndReflection(t *testing.T) {
+	exerciseProtoMessage(t, "CollectBinanceRequest",
+		func() *CollectBinanceRequest {
+			return &CollectBinanceRequest{TaskId: "cb", ImportPercentage: 88, ChunkSize: 7}
+		},
+		func() *CollectBinanceRequest { return &CollectBinanceRequest{} },
+	)
+
+	exerciseProtoMessage(t, "CollectBinanceByDateRequest",
+		func() *CollectBinanceByDateRequest {
+			return &CollectBinanceByDateRequest{TaskId: "cbd", StartTs: 11, EndTs: 22}
+		},
+		func() *CollectBinanceByDateRequest { return &CollectBinanceByDateRequest{} },
+	)
+
+	exerciseProtoMessage(t, "CollectUniswapRequest",
+		func() *CollectUniswapRequest {
+			return &CollectUniswapRequest{TaskId: "cu", PoolAddress: "pool", StartTs: 33, EndTs: 44}
+		},
+		func() *CollectUniswapRequest { return &CollectUniswapRequest{} },
+	)
+
+	exerciseProtoMessage(t, "ProcessPricesRequest",
+		func() *ProcessPricesRequest {
+			return &ProcessPricesRequest{
+				TaskId:              "pp",
+				StartDate:           1,
+				EndDate:             2,
+				AggregationInterval: "1m",
+				Overwrite:           true,
+				DbOverrides:         map[string]string{"dsn": "postgres"},
+			}
+		},
+		func() *ProcessPricesRequest { return &ProcessPricesRequest{} },
+	)
+
+	exerciseProtoMessage(t, "AnalyseRequest",
+		func() *AnalyseRequest {
+			return &AnalyseRequest{TaskId: "ar", BatchId: 9, Overwrite: true, StrategyJson: "{}"}
+		},
+		func() *AnalyseRequest { return &AnalyseRequest{} },
+	)
+
+	exerciseProtoMessage(t, "TaskResponse",
+		func() *TaskResponse {
+			return &TaskResponse{TaskId: "resp", Status: TaskStatus_SUCCESS}
+		},
+		func() *TaskResponse { return &TaskResponse{} },
+	)
+}
+
+type protoTestSubject interface {
+	proto.Message
+	interface {
+		Reset()
+		String() string
+		Descriptor() ([]byte, []int)
+		ProtoMessage()
+	}
+}
+
+func exerciseProtoMessage[T protoTestSubject](t *testing.T, name string, populated func() T, zero func() T) {
+	t.Helper()
+	t.Run(name, func(t *testing.T) {
+		msg := populated()
+		zeroMsg := zero()
+		require.NotEqual(t, zeroMsg.String(), msg.String())
+		msg.Reset()
+		require.True(t, proto.Equal(msg, zeroMsg))
+		msg.ProtoMessage()
+		require.NotNil(t, msg.ProtoReflect().Descriptor())
+		_, idx := msg.Descriptor()
+		require.NotEmpty(t, idx)
+		var nilMsg T
+		require.NotNil(t, nilMsg.ProtoReflect().Descriptor())
+	})
 }
 
 func resetProtoMessage(m proto.Message) {

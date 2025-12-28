@@ -96,6 +96,27 @@ func TestTemplateHandlerCRUDAndRun(t *testing.T) {
 	require.Len(t, templates, 0)
 }
 
+func TestTemplateHandlerRunTemplateAllowsEmptyBody(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	taskManager := service.NewTaskManager(db)
+	templateSvc := service.NewTemplateService(db, taskManager, nil)
+	handler := NewTemplateHandler(templateSvc, taskManager)
+
+	ctx := context.Background()
+	template, err := templateSvc.CreateTemplate(ctx, "Headless", "analyse", datatypes.JSONMap{"strategy": "baseline"})
+	require.NoError(t, err)
+
+	params := gin.Params{{Key: "id", Value: fmt.Sprintf("%d", template.ID)}}
+	emptyPayload := strings.NewReader("")
+	_, resp := invokeJSONHandler(t, handler.RunTemplate, http.MethodPost, fmt.Sprintf("/templates/%d/run", template.ID), emptyPayload, params)
+
+	var detail TaskDetailResponse
+	decodeData(t, resp.Data, &detail)
+	require.Equal(t, http.StatusOK, resp.Code)
+	require.Equal(t, "analyse", detail.Type)
+	require.NotEmpty(t, detail.TaskID)
+}
+
 func TestBatchHandlerLifecycle(t *testing.T) {
 	db := testutil.NewInMemoryDB(t)
 	batchSvc := service.NewBatchService(db)
@@ -158,6 +179,25 @@ func TestTaskHandlerEndpoints(t *testing.T) {
 	cancelPayload := strings.NewReader(`{"reason":"no longer needed"}`)
 	_, resp = invokeJSONHandler(t, handler.CancelTask, http.MethodPost, fmt.Sprintf("/tasks/%s/cancel", task.TaskID), cancelPayload, params)
 	decodeData(t, resp.Data, &detail)
+	require.Equal(t, "CANCELLED", detail.Status)
+}
+
+func TestTaskHandlerCancelTaskAllowsEmptyBody(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	taskManager := service.NewTaskManager(db)
+	handler := NewTaskHandler(taskManager)
+
+	ctx := context.Background()
+	task, err := taskManager.CreateTask(ctx, "collect_binance", "cancel-empty", "unit-test", service.EncodeConfig(nil))
+	require.NoError(t, err)
+
+	params := gin.Params{{Key: "task_id", Value: task.TaskID}}
+	emptyPayload := strings.NewReader("")
+	_, resp := invokeJSONHandler(t, handler.CancelTask, http.MethodPost, fmt.Sprintf("/tasks/%s/cancel", task.TaskID), emptyPayload, params)
+
+	var detail TaskDetailResponse
+	decodeData(t, resp.Data, &detail)
+	require.Equal(t, http.StatusOK, resp.Code)
 	require.Equal(t, "CANCELLED", detail.Status)
 }
 

@@ -300,6 +300,106 @@ func TestTaskProtoRawDescCaching(t *testing.T) {
 	require.Equal(t, first, second)
 }
 
+func TestTaskProtoGetterDefaultsAndValues(t *testing.T) {
+	t.Run("CollectBinanceRequest", func(t *testing.T) {
+		req := &CollectBinanceRequest{TaskId: "cb", ImportPercentage: 80, ChunkSize: 10}
+		require.Equal(t, "cb", req.GetTaskId())
+		require.Equal(t, int32(80), req.GetImportPercentage())
+		require.Equal(t, int32(10), req.GetChunkSize())
+
+		var nilReq *CollectBinanceRequest
+		require.Equal(t, "", nilReq.GetTaskId())
+		require.Equal(t, int32(0), nilReq.GetImportPercentage())
+		require.Equal(t, int32(0), nilReq.GetChunkSize())
+	})
+
+	t.Run("CollectBinanceByDateRequest", func(t *testing.T) {
+		req := &CollectBinanceByDateRequest{TaskId: "cbd", StartTs: 11, EndTs: 22}
+		require.Equal(t, "cbd", req.GetTaskId())
+		require.Equal(t, int32(11), req.GetStartTs())
+		require.Equal(t, int32(22), req.GetEndTs())
+
+		var nilReq *CollectBinanceByDateRequest
+		require.Equal(t, "", nilReq.GetTaskId())
+		require.Equal(t, int32(0), nilReq.GetStartTs())
+		require.Equal(t, int32(0), nilReq.GetEndTs())
+	})
+
+	t.Run("CollectUniswapRequest", func(t *testing.T) {
+		req := &CollectUniswapRequest{TaskId: "cu", PoolAddress: "pool", StartTs: 33, EndTs: 44}
+		require.Equal(t, "cu", req.GetTaskId())
+		require.Equal(t, "pool", req.GetPoolAddress())
+		require.Equal(t, int32(33), req.GetStartTs())
+		require.Equal(t, int32(44), req.GetEndTs())
+
+		var nilReq *CollectUniswapRequest
+		require.Equal(t, "", nilReq.GetTaskId())
+		require.Equal(t, "", nilReq.GetPoolAddress())
+		require.Equal(t, int32(0), nilReq.GetStartTs())
+		require.Equal(t, int32(0), nilReq.GetEndTs())
+	})
+
+	t.Run("ProcessPricesRequest", func(t *testing.T) {
+		req := &ProcessPricesRequest{
+			TaskId:              "pp",
+			StartDate:           1,
+			EndDate:             2,
+			AggregationInterval: "1m",
+			Overwrite:           true,
+			DbOverrides:         map[string]string{"dsn": "postgres"},
+		}
+		require.Equal(t, "pp", req.GetTaskId())
+		require.Equal(t, int32(1), req.GetStartDate())
+		require.Equal(t, int32(2), req.GetEndDate())
+		require.Equal(t, "1m", req.GetAggregationInterval())
+		require.True(t, req.GetOverwrite())
+		require.Equal(t, "postgres", req.GetDbOverrides()["dsn"])
+
+		var nilReq *ProcessPricesRequest
+		require.Equal(t, "", nilReq.GetTaskId())
+		require.Equal(t, int32(0), nilReq.GetStartDate())
+		require.Equal(t, int32(0), nilReq.GetEndDate())
+		require.Equal(t, "", nilReq.GetAggregationInterval())
+		require.False(t, nilReq.GetOverwrite())
+		require.Nil(t, nilReq.GetDbOverrides())
+	})
+
+	t.Run("AnalyseRequest", func(t *testing.T) {
+		req := &AnalyseRequest{TaskId: "ar", BatchId: 9, Overwrite: true, StrategyJson: "{}"}
+		require.Equal(t, "ar", req.GetTaskId())
+		require.Equal(t, int32(9), req.GetBatchId())
+		require.True(t, req.GetOverwrite())
+		require.Equal(t, "{}", req.GetStrategyJson())
+
+		var nilReq *AnalyseRequest
+		require.Equal(t, "", nilReq.GetTaskId())
+		require.Equal(t, int32(0), nilReq.GetBatchId())
+		require.False(t, nilReq.GetOverwrite())
+		require.Equal(t, "", nilReq.GetStrategyJson())
+	})
+
+	t.Run("TaskResponse", func(t *testing.T) {
+		req := &TaskResponse{TaskId: "resp", Status: TaskStatus_SUCCESS}
+		require.Equal(t, "resp", req.GetTaskId())
+		require.Equal(t, TaskStatus_SUCCESS, req.GetStatus())
+
+		var nilReq *TaskResponse
+		require.Equal(t, "", nilReq.GetTaskId())
+		require.Equal(t, TaskStatus_WAIT, nilReq.GetStatus())
+	})
+}
+
+func TestTaskStatusDescriptors(t *testing.T) {
+	data, idx := TaskStatus_RUNNING.EnumDescriptor()
+	require.NotEmpty(t, data)
+	require.Equal(t, []int{0}, idx)
+
+	require.NotNil(t, File_task_proto)
+	require.Contains(t, File_task_proto.Path(), "task.proto")
+	require.GreaterOrEqual(t, File_task_proto.Messages().Len(), 6)
+	require.Equal(t, protoreflect.FullName("task.v1.TaskStatus"), File_task_proto.Enums().Get(0).FullName())
+}
+
 func resetProtoMessage(m proto.Message) {
 	switch v := m.(type) {
 	case *CollectBinanceRequest:

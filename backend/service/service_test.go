@@ -68,3 +68,25 @@ func TestGetPriceComparisonDataFiltersWindowAndGroupsBySource(t *testing.T) {
 	assert.Equal(t, rows[0].TimeBucket.UnixMilli(), data["binance"][0][0])
 	assert.Equal(t, rows[1].TimeBucket.UnixMilli(), data["uniswap"][0][0])
 }
+
+func TestGetOpportunitiesPropagatesDBError(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	svc := NewService(db)
+	sqlDB, err := svc.DB().DB()
+	require.NoError(t, err)
+	require.NoError(t, sqlDB.Close())
+
+	_, _, err = svc.GetOpportunities(1, 1, "profit_usdt", "asc")
+	require.Error(t, err)
+}
+
+func TestGetPriceComparisonDataPropagatesDBError(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	svc := NewService(db)
+	sqlDB, err := svc.DB().DB()
+	require.NoError(t, err)
+	require.NoError(t, sqlDB.Close())
+
+	_, err = svc.GetPriceComparisonData(0, 10)
+	require.Error(t, err)
+}

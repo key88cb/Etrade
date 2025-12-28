@@ -119,3 +119,31 @@ func TestGetPriceComparisonDataHandlerRejectsBadTimestamp(t *testing.T) {
 
 	require.Equal(t, http.StatusBadRequest, w.Code)
 }
+
+func TestGetOpportunitiesHandlesServiceError(t *testing.T) {
+	h, svc := newTestHandler(t)
+	sqlDB, err := svc.DB().DB()
+	require.NoError(t, err)
+	require.NoError(t, sqlDB.Close())
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/opportunities", nil)
+
+	h.GetOpportunities(c)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestGetPriceComparisonHandlesServiceError(t *testing.T) {
+	h, svc := newTestHandler(t)
+	sqlDB, err := svc.DB().DB()
+	require.NoError(t, err)
+	require.NoError(t, sqlDB.Close())
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/price-comparison?startTime=1&endTime=2", nil)
+
+	h.GetPriceComparisonData(c)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}

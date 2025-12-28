@@ -224,3 +224,60 @@ func TestParseUintParamHelpers(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint(42), id)
 }
+
+func TestTemplateHandlerUpdateTemplateNotFound(t *testing.T) {
+	handler := newTemplateHandlerForTest(t)
+	c, w := newGinContext(http.MethodPut, "/templates/999", `{"name":"ghost","task_type":"analyse","config":{"pair":"ETHUSDT"}}`)
+	c.Params = gin.Params{{Key: "id", Value: "999"}}
+
+	handler.UpdateTemplate(c)
+
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestTemplateHandlerRunTemplateMissingTemplate(t *testing.T) {
+	handler := newTemplateHandlerForTest(t)
+	c, w := newGinContext(http.MethodPost, "/templates/999/run", `{"trigger":"manual","overrides":{"overwrite":true}}`)
+	c.Params = gin.Params{{Key: "id", Value: "999"}}
+
+	handler.RunTemplate(c)
+
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestBatchHandlerUpdateBatchNotFound(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	handler := NewBatchHandler(service.NewBatchService(db))
+	c, w := newGinContext(http.MethodPut, "/batches/77", `{"name":"missing","description":"ghost","refreshed":true}`)
+	c.Params = gin.Params{{Key: "id", Value: "77"}}
+
+	handler.UpdateBatch(c)
+
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestReportHandlerDeleteReportNotFound(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	handler := NewReportHandler(service.NewReportService(db))
+	c, w := newGinContext(http.MethodDelete, "/reports/33", "")
+	c.Params = gin.Params{{Key: "id", Value: "33"}}
+
+	handler.DeleteReport(c)
+
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestExperimentHandlerRunTemplateServiceError(t *testing.T) {
+	db := testutil.NewInMemoryDB(t)
+	taskManager := service.NewTaskManager(db)
+	templateSvc := service.NewTemplateService(db, taskManager, nil)
+	experimentSvc := service.NewExperimentService(db, templateSvc, taskManager)
+	handler := NewExperimentHandler(experimentSvc)
+
+	c, w := newGinContext(http.MethodPost, "/experiments/555/runs", `{"template_id":1,"trigger":"manual"}`)
+	c.Params = gin.Params{{Key: "id", Value: "555"}}
+
+	handler.RunTemplate(c)
+
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+}

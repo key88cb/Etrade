@@ -102,10 +102,27 @@ func TestDispatcherDispatchesByType(t *testing.T) {
 	require.EqualError(t, dispatcher.Dispatch(ctx, unsupported), "unsupported task type unknown")
 }
 
+func TestDispatcherProcessPricesWithStringOverrides(t *testing.T) {
+	client := &stubTaskClient{}
+	dispatcher := &GRPCTaskDispatcher{client: client, timeout: time.Second}
+	task := &models.Task{TaskID: "pp-map", Type: "process_prices", ConfigJSON: datatypes.JSONMap{
+		"start_date":           int64(10),
+		"end_date":             int64(20),
+		"aggregation_interval": "5m",
+		"db_overrides":         map[string]string{"dsn": "memory"},
+	}}
+	require.NoError(t, dispatcher.Dispatch(context.Background(), task))
+	require.Equal(t, "memory", client.pricesReq.GetDbOverrides()["dsn"])
+}
+
 func TestHelperConversions(t *testing.T) {
 	require.Equal(t, int64(42), asInt64("42"))
 	require.Equal(t, int64(0), asInt64("bad"))
 	require.True(t, asBool("true"))
 	require.False(t, asBool(0))
+	require.True(t, asBool(int64(2)))
+	require.True(t, asBool(float32(0.5)))
 	require.Equal(t, int64(1700000000), parseTimeOrInt("2023-11-14T22:13:20"))
+	require.Equal(t, int64(1700003600), parseTimeOrInt("2023-11-14T23:13:20"))
+	require.Equal(t, int64(99), parseTimeOrInt(int64(99)))
 }

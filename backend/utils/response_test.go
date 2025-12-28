@@ -73,4 +73,14 @@ func TestFailHelpers(t *testing.T) {
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 		require.Equal(t, "boom", resp.Message)
 	})
+
+	t.Run("server error default", func(t *testing.T) {
+		c, w := newTestContext()
+		ServerError(c, "")
+
+		require.Equal(t, http.StatusInternalServerError, w.Code)
+		var resp Response
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		require.Equal(t, "服务器内部错误", resp.Message)
+	})
 }

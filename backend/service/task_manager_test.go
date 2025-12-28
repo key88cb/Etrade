@@ -3,8 +3,11 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
+	"time"
 
+	"backend/models"
 	"backend/testutil"
 
 	"github.com/stretchr/testify/require"
@@ -82,4 +85,63 @@ func TestEncodeMergeAndFormatHelpers(t *testing.T) {
 
 	generic := FormatDBError(errors.New("boom"), "wrap")
 	require.Error(t, generic)
+}
+
+func TestTaskManagerCreateTaskRequiresType(t *testing.T) {
+	ctx := context.Background()
+	mgr := newTaskManager(t)
+	_, err := mgr.CreateTask(ctx, "", "", "", datatypes.JSONMap{})
+	require.EqualError(t, err, "task type is required")
+}
+
+func TestTaskManagerListTasksClampsLimit(t *testing.T) {
+	ctx := context.Background()
+	mgr := newTaskManager(t)
+	for i := 0; i < 30; i++ {
+		_, err := mgr.CreateTask(ctx, "collect", fmt.Sprintf("task-%d", i), "trigger", datatypes.JSONMap{})
+		require.NoError(t, err)
+	}
+
+	list, total, err := mgr.ListTasks(ctx, -5, 10_000)
+	require.NoError(t, err)
+	require.Equal(t, int64(30), total)
+	require.LessOrEqual(t, len(list), 20)
+}
+
+func TestTaskManagerListTaskLogsClampsLimit(t *testing.T) {
+	ctx := context.Background()
+	mgr := newTaskManager(t)
+	task, err := mgr.CreateTask(ctx, "collect", "loggy", "trigger", datatypes.JSONMap{})
+	require.NoError(t, err)
+	require.NoError(t, mgr.AddTaskLog(ctx, task.ID, "INFO", "first"))
+	require.NoError(t, mgr.AddTaskLog(ctx, task.ID, "INFO", "second"))
+
+	logs, err := mgr.ListTaskLogs(ctx, task.ID, 9999, 0)
+	require.NoError(t, err)
+	require.Len(t, logs, 2)
+}
+
+func TestCancelTaskByExternalIDSkipsTerminalStatuses(t *testing.T) {
+	ctx := context.Background()
+	mgr := newTaskManager(t)
+	finished := &models.Task{TaskID: "finished", Type: "collect", Status: "SUCCESS"}
+	require.NoError(t, mgr.db.WithContext(ctx).Create(finished).Error)
+
+	result, err := mgr.CancelTaskByExternalID(ctx, "finished", "ignored")
+	require.NoError(t, err)
+	require.Equal(t, "SUCCESS", result.Status)
+}
+
+func TestCancelTaskByExternalIDUsesStartedAtDuration(t *testing.T) {
+	ctx := context.Background()
+	mgr := newTaskManager(t)
+	started := time.Now().Add(-3 * time.Minute)
+	entry := &models.Task{TaskID: "inflight", Type: "collect", Status: "RUNNING", StartedAt: &started}
+	require.NoError(t, mgr.db.WithContext(ctx).Create(entry).Error)
+
+	result, err := mgr.CancelTaskByExternalID(ctx, "inflight", "maintenance")
+	require.NoError(t, err)
+	require.Equal(t, "CANCELLED", result.Status)
+	require.Contains(t, result.LogSummary, "maintenance")
+	require.Greater(t, result.DurationSeconds, int64(0))
 }

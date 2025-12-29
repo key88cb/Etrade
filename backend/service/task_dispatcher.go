@@ -54,6 +54,15 @@ func (d *GRPCTaskDispatcher) Dispatch(ctx context.Context, task *models.Task) er
 			ChunkSize:        chunkSize,
 		})
 		return err
+	case "collect_binance_by_date":
+		startTs := int32(asInt64(task.ConfigJSON["start_ts"]))
+		endTs := int32(asInt64(task.ConfigJSON["end_ts"]))
+		_, err := d.client.CollectBinanceByDate(reqCtx, &taskpb.CollectBinanceByDateRequest{
+			TaskId:   task.TaskID,
+			StartTs:  startTs,
+			EndTs:    endTs,
+		})
+		return err
 	case "collect_uniswap":
 		startTs := int32(asInt64(task.ConfigJSON["start_ts"]))
 		endTs := int32(asInt64(task.ConfigJSON["end_ts"]))

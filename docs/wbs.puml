@@ -1,0 +1,200 @@
+@startwbs
+skinparam WbsStrategy strict
+skinparam wrapWidth 200
+
+<style>
+node {
+Padding 10
+Margin 10
+HorizontalAlignment center
+LineColor #34495E
+FontName Arial
+}
+rootNode {
+BackgroundColor #2C3E50
+FontColor White
+FontSize 18
+FontStyle Bold
+}
+leafNode {
+BackgroundColor #FBFCFC
+RoundCorner 3
+FontSize 11
+}
+.Phase0 {
+BackgroundColor #7F8C8D  
+FontColor White
+FontSize 14
+FontStyle Bold
+}
+.SeeminglyDone {
+BackgroundColor #00c8ffff  
+FontColor White
+FontSize 14
+FontStyle Bold
+}
+.Doing {
+BackgroundColor #52be09ff  
+FontColor White
+FontSize 14
+FontStyle Bold
+}
+.CompletelyDone {
+BackgroundColor #000000ff  
+FontColor White
+FontSize 14
+FontStyle Bold
+}
+.TobeDiscussed {
+BackgroundColor #d95f5fff  
+FontColor White
+FontSize 14
+FontStyle Bold
+}
+.Phase1 {
+BackgroundColor #F1C40F 
+FontColor #7F8C8D
+FontSize 14
+FontStyle Bold
+}
+.Phase2 {
+BackgroundColor #E67E22 
+FontColor White
+FontSize 14
+FontStyle Bold
+}
+.Phase3 {
+BackgroundColor #27AE60 
+FontColor White
+FontSize 14
+FontStyle Bold
+}
+.Phase4 {
+BackgroundColor #2980B9
+FontColor White
+FontSize 14
+FontStyle Bold
+}
+.Phase5 {
+BackgroundColor #8E44AD 
+FontColor White
+FontSize 14
+FontStyle Bold
+}
+.Phase6 {
+BackgroundColor #16A085 
+FontColor White
+FontSize 14
+FontStyle Bold
+}
+.WorkPackage {
+BackgroundColor #ECF0F1
+FontColor #34495E
+FontSize 12
+FontStyle Italic
+LineColor #8E44AD
+LineThickness 2
+}
+
+</style>
+
+- Etrade 开发周期工作结构分解
+
+** 1.0 项目启动与 MVP 验证 (v0.1 - 已完成) <<Phase0>>
+*** 1.1 项目初始化 <<SeeminglyDone>>
+**** 1.1.1 团队组建与角色分工 √ <<SeeminglyDone>>
+**** 1.1.2 确定项目目标 (CEX-DEX 套利分析) √ <<SeeminglyDone>>
+**** 1.1.3 核心技术栈选型 (Go/Python/Vue/PG) √ ZZH <<SeeminglyDone>>
+*** 1.2 MVP 概念验证开发 <<SeeminglyDone>>
+**** 1.2.1 基础数据采集 (API/CSV 手动脚本) √ LHB CBF  <<SeeminglyDone>>
+**** 1.2.2 基础后端服务 (Go Gin 简单 API) √ LHB <<SeeminglyDone>>
+**** 1.2.3 基础前端展示 (ECharts 简易图表) √ ZZH LHB <<SeeminglyDone>>
+*** 1.3 MVP 评审与 v1.0 确立 <<SeeminglyDone>>
+**** 1.3.1 验证技术可行性 √ LHB <<SeeminglyDone>>
+**** 1.3.2 明确 v1.0 核心需求 (SRS v0.9) √ LHB ZZH + OTHERS <<SeeminglyDone>>
+
+
+** 2.0 v1.0 规划与设计 (已完成) <<Phase1>>
+*** 2.1 需求确认与交互定义 (WBS 1.0)<<SeeminglyDone>>
+**** 2.1.1 梳理分析师的操作流程图 (Flowchart)√ CBF <<SeeminglyDone>>
+**** 2.1.2 定义关键页面交互逻辑 (点击/跳转/反馈)√  CBF <<SeeminglyDone>>
+**** 2.1.3 编写软件需求规格说明书 (SRS v1.0)  <<SeeminglyDone>>
+**** 2.1.4 编写用例与流程图 <<SeeminglyDone>>
+*** 2.2 业务逻辑确认 (WBS 1.2)<<SeeminglyDone>>
+**** 2.2.1 确认数据粒度 (分钟/小时) 与时间跨度 √  <<SeeminglyDone>>
+**** 2.2.2 确认利润计算的数学公式 (含Gas/费率) √ ZZH <<SeeminglyDone>>
+**** 2.2.3 确认异常数据处理规则 (插值/丢弃) <<SeeminglyDone>>
+*** 2.3 规范定义 (WBS 2.0)<<SeeminglyDone>>
+**** 2.3.1 前端设计系统 (UI 风格, Ant Design Vue) CBF<<SeeminglyDone>>
+**** 2.3.2 后端接口规范 (API Contract, Apifox) √ LHB <<SeeminglyDone>>
+**** 2.3.3 代码协作规范 (Git, Linter, 命名) √ ZZH <<SeeminglyDone>>
+*** 2.4 系统架构设计 (WBS 3.0)<<SeeminglyDone>>
+**** 2.4.1 数据库模型设计 (E-R 图, 索引)<<SeeminglyDone>>
+**** 2.4.2 应用层架构设计 (前后端目录, 脚本模块) 第一阶段 √ <<SeeminglyDone>>
+
+** 3.0 v1.0 基础设施搭建 (已完成) <<Phase3>>
+*** 3.1 前端工程初始化 <<SeeminglyDone>>
+**** 3.1.1 Vue3 + Vite + TS 脚手架 √ LHB ZZH <<SeeminglyDone>>
+**** 3.1.2 UI 库/Axios/Pinia/Router 配置 <<SeeminglyDone>>
+*** 3.2 后端工程初始化 <<SeeminglyDone>>
+**** 3.2.1 Go Module + Gin + GORM <<SeeminglyDone>>
+*** 3.3 接口文档与 Mock<<SeeminglyDone>>
+**** 3.3.1 Apifox 录入 v1.0 接口 LHB <<SeeminglyDone>>
+**** 3.3.2 生成 Mock 数据供前端调试<<SeeminglyDone>>
+*** 3.4 基础设施扩充 <<SeeminglyDone>>
+**** 3.4.1 gRPC Worker 环境搭建 (Python + grpcio + proto 编译)<<SeeminglyDone>>
+**** 3.4.2 数据库实例化 (task/templates/batch/report 等表)<<SeeminglyDone>>
+**** 3.4.3 日志 & 监控基线 (task_logs, swagger 监控)<<SeeminglyDone>>
+**** 3.4.4 RabbitMQ 队列配置 (本地/容器) <<SeeminglyDone>>
+
+** 4.0 v1.0 核心功能开发 (已完成) <<Phase4>>
+*** 4.1 [工作包] 后台数据管道 (UC-03 至 06)<<SeeminglyDone>>
+**** 4.1.1 负责人: Zzh, Sjm (数据/算法团队)<<SeeminglyDone>>
+**** 4.1.2 开发: Uniswap 数据采集脚本 (FR-1.1) <<SeeminglyDone>>
+**** 4.1.3 开发: Binance CSV 导入脚本 (FR-1.2) <<SeeminglyDone>>
+**** 4.1.3.1 开发: Binance 按时间范围下载 (CollectBinanceByDate) <<SeeminglyDone>>
+**** 4.1.4 开发: 价格聚合脚本 (FR-3.1) <<SeeminglyDone>>
+**** 4.1.5 开发: 套利分析引擎脚本 (FR-4.1) <<SeeminglyDone>>
+**** 4.1.6 开发: 任务编排 (Queue + 并发消费 + 重试) <<SeeminglyDone>>
+**** 4.1.7 实现: Python Worker gRPC 服务 (Collect/Process/Analyse)<<SeeminglyDone>>
+**** 4.1.8 实现: 任务日志写入 (mark_started/finished) 与批次自动创建<<SeeminglyDone>>
+**** 4.1.8.1 实现: 任务取消轮询 (check_task / CANCELLED) <<SeeminglyDone>>
+**** 4.1.9 编写: Python 脚本单元测试<<SeeminglyDone>>
+*** 4.2 [工作包] 后端 API 服务 (UC-01, 02)<<SeeminglyDone>>
+**** 4.2.1 负责人: Lhb, Xhr (后端团队)<<SeeminglyDone>>
+**** 4.2.2 开发: 价格对比 API (FR-5.2) <<SeeminglyDone>>
+**** 4.2.3 开发: 套利机会 API (FR-5.3) <<SeeminglyDone>>
+**** 4.2.4 开发: 任务管理 API (/tasks, /task-logs) <<SeeminglyDone>>
+**** 4.2.5 开发: 模板 / 批次 / 报告 API (run-template / batch refresh / download) <<SeeminglyDone>>
+**** 4.2.6 实现: gRPC Dispatcher (Go -> Python Worker) <<SeeminglyDone>>
+**** 4.2.6.1 支持: CollectBinanceByDate 调度贯通 <<SeeminglyDone>>
+**** 4.2.6.2 实现: 任务取消接口 (/tasks/:id/cancel) <<SeeminglyDone>>
+**** 4.2.6.3 实现: 实验 API (experiments / runs) <<SeeminglyDone>>
+**** 4.2.7 编写: Go API 单元/集成测试 <<SeeminglyDone>>
+**** 4.2.8 部署: 编写 Dockerfile <<TobeDiscussed>>
+*** 4.3 [工作包] 前端可视化界面 (UC-01, 02)<<SeeminglyDone>>
+**** 4.3.1 负责人: Bf, Lhb (前端团队)<<SeeminglyDone>>
+**** 4.3.2 开发: 公共布局 (Layout) 与导航 <<SeeminglyDone>>
+**** 4.3.3 开发: 价格可视化页面 (FR-6.x)<<SeeminglyDone>>
+**** 4.3.4 开发: 套利机会仪表盘 (FR-7.x)<<SeeminglyDone>>
+**** 4.3.5 开发: 任务中心 (任务列表/日志/运行按钮)<<SeeminglyDone>>
+**** 4.3.6 开发: 模板管理 & 批次详情 (批次→机会→报告)<<SeeminglyDone>>
+**** 4.3.7 开发: 数据管理面板（Pipeline 配置、报告触发）<<SeeminglyDone>>
+**** 4.3.7.1 增强: “下载最新数据（时间窗口）”快捷入口 <<SeeminglyDone>>
+**** 4.3.7.2 增强: 实验对比运行入口（基于 batch） <<SeeminglyDone>>
+**** 4.3.8 联调: 对接 API (Mock -> Real) <<SeeminglyDone>>
+
+** 5.0 v1.0 测试与交付 (已完成) <<Phase5>>
+*** 5.1 集成测试 (负责人: 全体) <<SeeminglyDone>>
+**** 5.1.1 端到端回归：任务 → 执行 → 机会 → 报告 <<SeeminglyDone>>
+**** 5.1.2 完整数据流测试 (CEX/DEX -> DB -> Worker -> API -> 前端) <<SeeminglyDone>>
+**** 5.1.3 Worker 稳定性测试 (队列/并发/失败恢复/取消) <<SeeminglyDone>>
+*** 5.2 非功能需求 (NFR) 验收 (负责人: Lhb) <<SeeminglyDone>>
+**** 5.2.1 性能: API 响应时间 (NFR-1.1) <<SeeminglyDone>>
+**** 5.2.2 性能: 脚本运行时间 (NFR-1.2) <<SeeminglyDone>>
+**** 5.2.3 安全: 凭据不硬编码/配置检查 (NFR-4.1) <<SeeminglyDone>>
+*** 5.3 最终交付物 <<SeeminglyDone>>
+**** 5.3.1 最终版 SRS 与 API 文档（含变更记录） <<SeeminglyDone>>
+**** 5.3.2 项目演示 (Final Presentation) <<SeeminglyDone>>
+**** 5.3.3 简易部署/用户手册 <<SeeminglyDone>>
+@endwbs

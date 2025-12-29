@@ -71,6 +71,10 @@ func TestDispatcherDispatchesByType(t *testing.T) {
 	require.EqualValues(t, 100, client.binanceReq.GetImportPercentage())
 	require.EqualValues(t, 1000000, client.binanceReq.GetChunkSize())
 
+	binanceByDate := &models.Task{TaskID: "bin-date", Type: "collect_binance_by_date", ConfigJSON: datatypes.JSONMap{"start_ts": 10, "end_ts": 20}}
+	require.NoError(t, dispatcher.Dispatch(ctx, binanceByDate))
+	require.Equal(t, "binance-by-date", client.lastMethod)
+
 	uniswapTask := &models.Task{TaskID: "uni", Type: "collect_uniswap", ConfigJSON: datatypes.JSONMap{"pool_address": "pool", "start_ts": 1, "end_ts": 2}}
 	require.NoError(t, dispatcher.Dispatch(ctx, uniswapTask))
 	require.Equal(t, "uniswap", client.lastMethod)

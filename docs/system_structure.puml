@@ -1,0 +1,28 @@
+@startuml
+!theme materia-outline
+skinparam componentStyle uml2
+skinparam Linetype ortho
+
+actor "分析师 / 浏览器" as User
+
+component "Vue.js 前端\n(任务中心 / 模板 / 批次)" as VueApp
+component "Go 后端 API\n(Gin + gRPC Dispatcher)" as GoApi
+database "PostgreSQL 数据库" as DB
+queue "RabbitMQ\n(任务队列)" as MQ
+component "Python Worker\n(gRPC 服务 + 消费者)" as Worker
+agent "数据脚本\n(collect/process/analyse)" as PythonScript
+artifact "Report Storage\n(PDF/HTML/Markdown)" as ReportFS
+
+User --> VueApp : 浏览器访问
+VueApp <-> GoApi : HTTP/JSON (REST APIs)
+
+GoApi --> DB : 读写任务/模板/批次等
+GoApi --> Worker : gRPC 下发任务请求
+GoApi --> ReportFS : 生成并写入报告文件
+
+Worker <--> MQ : publish/consume task messages
+Worker <--> DB : 写入采集/分析数据\n写 task_logs / 更新 tasks
+Worker --> PythonScript : 执行采集/聚合/分析脚本
+PythonScript --> DB : 读写行情/聚合/机会数据
+
+@enduml

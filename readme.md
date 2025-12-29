@@ -260,8 +260,69 @@ npm run dev        # 开发模式
 - **任务一直 RUNNING**：确认 Python Worker 已启动，且后端 `worker.address` 指向正确端口；检查数据库 `task_logs` 是否有日志，若无则 Worker 未执行。
 - **端口冲突**：Go HTTP `:8888`，Go gRPC `:50060`，Python Worker `:50052`。确保三者不冲突。
 - **proto 导入失败**：确认 `data/protos/task_pb2.py` 与 `data/protos/task_pb2_grpc.py` 存在；建议从 `data/` 目录启动 Worker。
+- **配置/密钥泄露风险**：`data/config/config.yaml` 中包含数据库密码、The Graph API Key 等敏感信息；不要提交到公开仓库，建议复制一份 `data/config/config.yaml.example`（或用环境变量/私有配置文件）并加入 `.gitignore`。
+- **The Graph 请求失败 / 401**：检查 `data/config/config.yaml` 的 `the_graph.api_key` 是否有效；免费额度/速率限制也可能导致间歇失败，可缩小时间范围或降低并发。
+- **Binance 下载失败 / 403/404**：`collect_binance_by_date` 会从 `data.binance.vision` 拉取日级 zip；若指定日期不存在或网络受限会失败，建议先用较短时间范围验证。
+- **RabbitMQ 连接失败**：确认容器已启动且账号密码与 `data/config/config.yaml` 的 `rabbitmq.*` 一致；Windows + Docker 场景下注意端口映射与防火墙。
+- **数据库权限不足/表不存在**：首次启动后端会 AutoMigrate 建表；如果 Worker 先跑、但数据库里还没有 `tasks/task_logs` 等表，会导致写日志失败，建议按顺序启动：DB → 后端 → Worker。
+- **时间格式不匹配**：前端 datetime-local 生成本地时间，后端/脚本按 UTC 解析；建议在选择时间范围时统一使用 UTC（或在配置里明确时区）。
 
 按以上步骤即可启动完整系统：先启动 PostgreSQL → Python Worker → Go 后端 → 前端；然后访问前端面板或 REST API，即可使用套利分析平台。
+
+### 8. 部署到服务器（示例：Linux）
+
+下面给出一个最小可用的“单机部署”思路（数据库与队列也可替换为云服务）。
+
+1) **准备依赖**
+- PostgreSQL（或云数据库）
+- RabbitMQ（或云队列）
+- Go 1.20+、Python 3.10+、Node.js 18+
+
+2) **配置文件**
+- 后端：编辑 `backend/config/config.yaml`（数据库、`worker.address`、gRPC 端口）
+- Worker：编辑 `data/config/config.yaml`（数据库、RabbitMQ）
+- 前端：通过环境变量指定后端地址（默认 `http://localhost:8888/api/v1`）
+  - `frontend/.env.production` 中写入：`VITE_BACKEND_URL=http://<your-host>:8888/api/v1`
+
+3) **启动服务（注意工作目录）**
+
+- Python Worker（务必在 `data/` 目录运行，保证能正确读取 `./config/config.yaml`）：
+```bash
+cd data
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python server.py
+```
+
+- Go 后端（务必在 `backend/` 目录运行，保证能读取 `./config/config.yaml`）：
+```bash
+cd backend
+go mod tidy
+go build -o etrade-api .
+./etrade-api
+```
+
+- 前端（构建后可用 Nginx 托管 `dist/`，或临时用 preview 启动）：
+```bash
+cd frontend
+npm install
+npm run build
+npm run preview -- --host 0.0.0.0 --port 5173
+```
+
+4) **验证**
+- Swagger：`http://<your-host>:8888/swagger/index.html`
+- 前端：`http://<your-host>:5173/`
+
+### 9. 端口清单（默认）
+
+- PostgreSQL：`5432`
+- RabbitMQ：`5672`（管理台 `15672`）
+- Go 后端 HTTP：`8888`
+- Go 内部 gRPC：`50060`
+- Python Worker gRPC：`50052`
+- 前端开发/preview：`5173`
 
 ## 许可证
 

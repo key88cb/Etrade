@@ -117,6 +117,10 @@ const legacyReportForm = ref({
   template_id: '',
 });
 
+const reportActionMessage = ref('');
+const reportActionError = ref('');
+const legacyReportLoading = ref(false);
+
 const templateConfigs = reactive<TemplateConfigs>({
   collect_binance: { csv_path: '/data/binance_aggTrades_ETHUSDT.csv', import_percentage: 100, chunk_size: 1000000 },
   collect_uniswap: { pool_address: '0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640', start_date: '', end_date: '' },
@@ -130,6 +134,16 @@ const tasks = ref<Task[]>([
   { id: 'process-prices', taskType: 'process_prices', name: 'Price Aggregation', description: 'Aggregate raw market data', icon: 'database', status: 'idle' },
   { id: 'analyse', taskType: 'analyse', name: 'Arbitrage Analysis', description: 'Detect arbitrage windows', icon: 'trending', status: 'idle' },
 ]);
+
+const latestRangeOptions = [
+  { label: '最近 1 小时', seconds: 60 * 60 },
+  { label: '最近 6 小时', seconds: 6 * 60 * 60 },
+  { label: '最近 24 小时', seconds: 24 * 60 * 60 },
+  { label: '最近 7 天', seconds: 7 * 24 * 60 * 60 },
+] as const;
+
+const latestRangeSeconds = ref<number>(latestRangeOptions[1].seconds);
+const latestDownloadLoading = ref(false);
 
 const labelTextClass = computed(() => (isDark.value ? 'text-[#e6edf3]' : 'text-[#24292f]'));
 const baseInputClass = 'w-full px-3 py-1.5 border rounded-md focus:outline-none focus:ring-2 text-xs focus:border-transparent transition-all';
@@ -277,6 +291,63 @@ const buildOverrides = (taskType: PipelineTaskType): Record<string, unknown> => 
   }
 };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const toAbsoluteDownloadUrl = (reportId: number) => `${backendURL}/reports/${reportId}/download`;
+
+const downloadReport = (reportId: number) => {
+  const url = toAbsoluteDownloadUrl(reportId);
+  const win = window.open(url, '_blank', 'noopener,noreferrer');
+  if (!win) {
+    window.location.href = url;
+  }
+};
+
+const pickLatestTemplateByType = (taskType: string): Template | undefined => {
+  const matches = templates.value.filter((t) => t.task_type === taskType);
+  if (matches.length === 0) return undefined;
+  return matches.reduce((best, cur) => (cur.id > best.id ? cur : best), matches[0]);
+};
+
+const ensureTemplateByType = async (taskType: string): Promise<Template> => {
+  const existing = pickLatestTemplateByType(taskType);
+  if (existing) return existing;
+
+  const name = `Auto ${taskType} ${new Date().toLocaleString('zh-CN', { hour12: false })}`;
+  await api.createTemplate({ name, task_type: taskType, config: {} });
+  await fetchControlData();
+  const created = pickLatestTemplateByType(taskType);
+  if (!created) throw new Error(`模板创建失败: ${taskType}`);
+  return created;
+};
+
+const downloadLatestData = async () => {
+  controlError.value = '';
+  latestDownloadLoading.value = true;
+  try {
+    const endTs = Math.floor(Date.now() / 1000);
+    const startTs = Math.max(0, endTs - latestRangeSeconds.value);
+
+    const binanceTpl = await ensureTemplateByType('collect_binance_by_date');
+    await api.runTemplate(binanceTpl.id, { overrides: { start_ts: startTs, end_ts: endTs } });
+
+    const uniswapTpl = await ensureTemplateByType('collect_uniswap');
+    await api.runTemplate(uniswapTpl.id, {
+      overrides: {
+        pool_address: templateConfigs.collect_uniswap.pool_address,
+        start_ts: startTs,
+        end_ts: endTs,
+      },
+    });
+
+    await fetchControlData();
+  } catch (error: any) {
+    controlError.value = error?.message ?? '下载最新数据失败';
+  } finally {
+    latestDownloadLoading.value = false;
+  }
+};
+
 const updateTaskState = (taskType: PipelineTaskType, payload: Partial<Task>) => {
   tasks.value = tasks.value.map((task) => task.taskType === taskType ? { ...task, ...payload } : task);
 };
@@ -350,16 +421,30 @@ const handleCreateReport = async () => {
     return;
   }
   isGeneratingReport.value = true;
+  reportActionMessage.value = '';
+  reportActionError.value = '';
   try {
-    await api.createReport({
+    const { data } = await api.createReport({
       batch_id: Number(reportForm.batch_id),
       template_id: reportForm.template_id ? Number(reportForm.template_id) : undefined,
       format: reportForm.format
     });
     showReportModal.value = false;
+    const reportId = data?.data?.id ?? data?.id;
+    reportActionMessage.value = reportId ? `已提交报告生成请求：Report #${reportId}` : '已提交报告生成请求';
     await fetchReports();
+
+    if (reportId) {
+      for (let i = 0; i < 12; i += 1) {
+        await sleep(1200);
+        await fetchReports();
+        const found = reports.value.find((r) => r.id === reportId);
+        const st = String(found?.status ?? '').toUpperCase();
+        if (st === 'SUCCESS' || st === 'FAILED') break;
+      }
+    }
   } catch (e: any) {
-    alert('Failed to generate report: ' + e.message);
+    reportActionError.value = e?.message ?? '生成报告失败';
   } finally {
     isGeneratingReport.value = false;
   }
@@ -449,14 +534,33 @@ const runPipelineTask = async (taskType: PipelineTaskType) => {
 
 const submitLegacyReport = async () => {
   if (!legacyReportForm.value.batch_id) return;
+  legacyReportLoading.value = true;
+  reportActionMessage.value = '';
+  reportActionError.value = '';
   try {
-    await api.createReport({
+    const { data } = await api.createReport({
       batch_id: Number(legacyReportForm.value.batch_id),
       template_id: legacyReportForm.value.template_id ? Number(legacyReportForm.value.template_id) : undefined,
       format: legacyReportForm.value.format,
     });
     await fetchReports();
-  } catch (e) { console.error(e); }
+    const reportId = data?.data?.id ?? data?.id;
+    reportActionMessage.value = reportId ? `已提交报告生成请求：Report #${reportId}` : '已提交报告生成请求';
+
+    if (reportId) {
+      for (let i = 0; i < 12; i += 1) {
+        await sleep(1200);
+        await fetchReports();
+        const found = reports.value.find((r) => r.id === reportId);
+        const st = String(found?.status ?? '').toUpperCase();
+        if (st === 'SUCCESS' || st === 'FAILED') break;
+      }
+    }
+  } catch (e: any) {
+    reportActionError.value = e?.message ?? '生成报告失败';
+  } finally {
+    legacyReportLoading.value = false;
+  }
 };
 
 onMounted(fetchAllData);
@@ -478,6 +582,8 @@ onMounted(fetchAllData);
           <Plus class="w-4 h-4" /> New Report
         </button>
       </div>
+      <p v-if="reportActionError" class="text-xs text-[#f85149]">{{ reportActionError }}</p>
+      <p v-else-if="reportActionMessage" class="text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">{{ reportActionMessage }}</p>
 
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse">
@@ -515,15 +621,15 @@ onMounted(fetchAllData);
                 </span>
               </td>
               <td class="py-2 px-3 text-right flex items-center justify-end gap-2">
-                <a 
+                <button
                   v-if="(report.status.toUpperCase() === 'SUCCESS') && (report.file_url || report.file_path)" 
-                  :href="`${backendURL}/reports/${report.id}/download`" 
-                  target="_blank"
+                  type="button"
+                  @click="downloadReport(report.id)"
                   class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-blue-500 transition-colors"
                   title="Download"
                 >
                   <FileDown class="w-4 h-4" />
-                </a>
+                </button>
                 <button 
                   @click="handleDeleteReport(report.id)"
                   class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-red-500 transition-colors"
@@ -539,9 +645,28 @@ onMounted(fetchAllData);
     </div>
 
     <div class="rounded-md border p-4 space-y-4" :class="isDark ? 'bg-[#161b22] border-[#30363d]' : 'bg-white border-[#d0d7de]'">
-      <div class="flex items-center gap-2">
-        <Play class="w-4 h-4" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'" />
-        <h2 :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">Pipeline Control</h2>
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <Play class="w-4 h-4" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'" />
+          <h2 :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">Pipeline Control</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <select
+            v-model.number="latestRangeSeconds"
+            class="px-2 py-1.5 text-xs rounded border"
+            :class="isDark ? 'bg-[#0d1117] border-[#30363d] text-[#e6edf3]' : 'bg-[#f6f8fa] border-[#d0d7de] text-[#24292f]'"
+            :disabled="latestDownloadLoading"
+          >
+            <option v-for="opt in latestRangeOptions" :key="opt.seconds" :value="opt.seconds">{{ opt.label }}</option>
+          </select>
+          <button
+            class="px-3 py-1.5 text-xs rounded bg-[#0969da] text-white hover:bg-[#1f6feb] disabled:opacity-60"
+            :disabled="latestDownloadLoading"
+            @click="downloadLatestData"
+          >
+            {{ latestDownloadLoading ? '下载中…' : '下载最新数据' }}
+          </button>
+        </div>
       </div>
       <p v-if="controlError" class="text-xs text-[#f85149]">{{ controlError }}</p>
       <div class="space-y-3">
@@ -639,7 +764,9 @@ onMounted(fetchAllData);
         </div>
         <div class="grid grid-cols-1 gap-2 text-xs">
           <input v-model="legacyReportForm.batch_id" type="number" placeholder="Batch ID" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />
-          <button class="w-full px-3 py-1.5 bg-[#238636] text-white text-xs rounded" @click="submitLegacyReport">Submit</button>
+          <button class="w-full px-3 py-1.5 bg-[#238636] text-white text-xs rounded disabled:opacity-60" :disabled="legacyReportLoading" @click="submitLegacyReport">
+            {{ legacyReportLoading ? 'Submitting...' : 'Submit' }}
+          </button>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import * as echarts from 'echarts';
-import api, { type ReportPayload } from '../api';
+import api, { backendURL, type ReportPayload } from '../api';
 
 interface ReportItem {
   id: number;
@@ -10,6 +10,7 @@ interface ReportItem {
   format: string;
   file_path?: string;
   generated_at?: string;
+  status?: string;
 }
 
 const reports = ref<ReportItem[]>([]);
@@ -69,6 +70,8 @@ const submitReport = async () => {
     creating.value = false;
   }
 };
+
+const downloadUrl = (id: number) => `${backendURL}/reports/${id}/download`;
 
 onMounted(fetchReports);
 
@@ -238,14 +241,14 @@ onBeforeUnmount(() => {
               <td class="px-4 py-2">{{ report.generated_at ?? '-' }}</td>
               <td class="px-4 py-2">
                 <a
-                  v-if="report.file_path"
-                  :href="report.file_path"
+                  v-if="String(report.status ?? '').toUpperCase() === 'SUCCESS'"
+                  :href="downloadUrl(report.id)"
                   target="_blank"
                   class="text-blue-600 text-xs hover:underline"
                 >
                   下载
                 </a>
-                <span v-else class="text-[#57606a] dark:text-[#7d8590] text-xs">—</span>
+                <span v-else class="text-[#57606a] dark:text-[#7d8590] text-xs">{{ report.status ?? 'PENDING' }}</span>
               </td>
             </tr>
             <tr v-if="!loading && reports.length === 0">

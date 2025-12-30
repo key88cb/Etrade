@@ -71,6 +71,9 @@ func (s *ReportService) GenerateReportFile(reportID uint, batchID uint, format s
 		formatUpper = "PDF"
 	}
 
+	// 标记为生成中（前端可据此显示加载状态）
+	_ = s.updateStatus(reportID, "GENERATING", "")
+
 	// 1. 查询数据
 	var results []map[string]interface{}
 

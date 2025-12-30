@@ -634,14 +634,15 @@ onBeforeUnmount(() => {
           <input
             v-model="form.name"
             type="text"
-            class="w-full border rounded px-3 py-2 text-sm"
+            placeholder="请输入模板名称"
+            class="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-[#0d1117] text-[#24292f] dark:text-[#e6edf3] border-[#d0d7de] dark:border-[#30363d] placeholder:text-[#8c959f] dark:placeholder:text-[#7d8590]"
           />
         </div>
         <div class="space-y-2">
           <label class="text-sm text-[#57606a] dark:text-[#7d8590]">任务类型</label>
           <select
             v-model="form.task_type"
-            class="w-full border rounded px-3 py-2 text-sm"
+            class="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-[#0d1117] text-[#24292f] dark:text-[#e6edf3] border-[#d0d7de] dark:border-[#30363d]"
           >
             <option value="collect_binance">collect_binance</option>
             <option value="collect_uniswap">collect_uniswap</option>
@@ -655,7 +656,8 @@ onBeforeUnmount(() => {
             :value="formattedConfig"
             @input="handleConfigChange"
             rows="6"
-            class="w-full border rounded px-3 py-2 text-xs font-mono"
+            placeholder='例如：{"batch_id": 1, "overwrite": false, "strategy": {"profit_threshold": 10}}'
+            class="w-full border rounded px-3 py-2 text-xs font-mono bg-white dark:bg-[#0d1117] text-[#24292f] dark:text-[#e6edf3] border-[#d0d7de] dark:border-[#30363d] placeholder:text-[#8c959f] dark:placeholder:text-[#7d8590]"
           />
           <p class="text-xs text-[#57606a] dark:text-[#7d8590]">
             根据任务类型填写对应字段，例如 collect_binance 需要 csv_path、import_percentage 等。

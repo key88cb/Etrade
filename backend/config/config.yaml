@@ -8,3 +8,8 @@ grpc:
   port: ":50060"
 worker:
   address: "127.0.0.1:50052"
+
+llm:
+  api_key: "---"
+  model: "qwen-turbo"
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"

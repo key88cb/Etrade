@@ -23,6 +23,7 @@ func SetupRouter(taskHandler *TaskHandler, templateHandler *TemplateHandler, bat
 	{
 		// 3. 将路由绑定到 Handler 的方法上
 		apiV1.GET("/opportunities", h.GetOpportunities)
+		apiV1.POST("/opportunities/:id/analyze", h.AnalyzeOpportunity) // 新增路由
 		apiV1.GET("/price-comparison", h.GetPriceComparisonData)
 
 		if taskHandler != nil {

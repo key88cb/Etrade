@@ -469,6 +469,61 @@
         <a-card size="small" title="价格上下文（mini）" :bordered="false">
           <div ref="miniPriceRef" style="height: 260px;"></div>
         </a-card>
+
+        <a-card size="small" :bordered="false" class="mt-4 bg-gray-50">
+          <template #title>
+             <div class="flex items-center gap-2">
+                <RobotOutlined class="text-blue-500" />
+                <span>AI 风险顾问</span>
+             </div>
+          </template>
+          <template #extra>
+            <a-button 
+              type="primary" 
+              ghost 
+              size="small" 
+              :loading="analyzing" 
+              @click="analyzeRisk"
+              class="flex items-center gap-1"
+            >
+              <template #icon v-if="!analyzing"><RobotOutlined /></template>
+              {{ selectedOpp?.llm_analysis ? '重新分析' : '开始分析' }}
+            </a-button>
+          </template>
+          
+          <div v-if="selectedOpp?.llm_analysis" class="py-2">
+            <div class="flex items-center gap-3 mb-3">
+              <span class="text-gray-500 text-sm">风险等级:</span>
+              <a-tag :color="getRiskLevelColor(selectedOpp.llm_analysis.risk_level)" class="px-3 py-0.5 text-sm font-medium rounded-full">
+                {{ selectedOpp.llm_analysis.risk_level }}
+              </a-tag>
+            </div>
+            
+            <div class="mb-4 text-gray-700 bg-white p-4 rounded-lg border border-gray-100 shadow-sm leading-relaxed">
+              {{ selectedOpp.llm_analysis.summary }}
+            </div>
+
+            <div v-if="selectedOpp.llm_analysis.warning" class="mb-4 bg-red-50 p-3 rounded-lg border border-red-100 flex items-start gap-2 text-red-700">
+              <AlertOutlined class="mt-1" />
+              <span class="text-sm font-medium">{{ selectedOpp.llm_analysis.warning }}</span>
+            </div>
+
+            <div v-if="selectedOpp.llm_analysis.suggestions && selectedOpp.llm_analysis.suggestions.length">
+              <div class="text-sm font-semibold text-gray-800 mb-2">操作建议:</div>
+              <ul class="list-none space-y-1.5 pl-0">
+                <li v-for="(s, i) in selectedOpp.llm_analysis.suggestions" :key="i" class="flex items-start gap-2 text-sm text-gray-600">
+                   <span class="text-blue-400 mt-1">•</span>
+                   <span>{{ s }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+          
+          <div v-else class="flex flex-col items-center justify-center py-10 text-gray-400">
+            <RobotOutlined class="text-4xl mb-3 text-gray-300" />
+            <div class="text-sm">点击右上角按钮获取 AI 深度风险评估</div>
+          </div>
+        </a-card>
       </div>
     </a-modal>
   </div>
@@ -488,6 +543,8 @@ import {
   RiseOutlined,
   DatabaseOutlined,
   TrophyOutlined,
+  AlertOutlined,
+  RobotOutlined,
 } from '@ant-design/icons-vue';
 
 interface RiskMetrics {
@@ -506,6 +563,12 @@ interface Opportunity {
   profit_usdt: number;
   batch_id?: number;
   risk_metrics?: RiskMetrics;
+  llm_analysis?: {
+    risk_level: string;
+    summary: string;
+    suggestions: string[];
+    warning?: string;
+  };
   details?: {
     block_time?: string;
     experiment_id?: string | number;
@@ -727,6 +790,37 @@ const selectedOpp = ref<Opportunity | null>(null);
 const riskGaugeRef = ref<HTMLDivElement | null>(null);
 const riskRadarRef = ref<HTMLDivElement | null>(null);
 const miniPriceRef = ref<HTMLDivElement | null>(null);
+const analyzing = ref(false);
+
+const analyzeRisk = async () => {
+  if (!selectedOpp.value) return;
+  analyzing.value = true;
+  try {
+    const res = await api.analyzeOpportunity(selectedOpp.value.id);
+    if (res.data.code === 200) {
+       // 后端返回的 data 字段即为 JSONMap
+       selectedOpp.value.llm_analysis = res.data.data;
+       message.success('AI 分析完成');
+    } else {
+       message.error(res.data.message || '分析失败');
+    }
+  } catch (e) {
+    console.error(e);
+    message.error('请求 AI 分析失败');
+  } finally {
+    analyzing.value = false;
+  }
+};
+
+const getRiskLevelColor = (level?: string) => {
+  switch (level?.toLowerCase()) {
+    case 'low': return 'success';
+    case 'medium': return 'warning';
+    case 'high': return 'error';
+    default: return 'default';
+  }
+};
+
 let riskGaugeChart: echarts.ECharts | null = null;
 let riskRadarChart: echarts.ECharts | null = null;
 let miniPriceChart: echarts.ECharts | null = null;

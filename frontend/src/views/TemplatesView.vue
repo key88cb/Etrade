@@ -50,6 +50,24 @@ const typeCounts = computed(() => {
   return counts;
 });
 
+const getTemplateConfig = (tpl: any): Record<string, unknown> => {
+  if (!tpl) return {};
+  return tpl.config ?? tpl.ConfigJSON ?? tpl.config_json ?? tpl.Config ?? {};
+};
+
+const normalizeTemplate = (tpl: any): TemplateItem => {
+  const normalized: any = {
+    ...tpl,
+    id: tpl?.id ?? tpl?.ID ?? tpl?.Id ?? 0,
+    name: tpl?.name ?? tpl?.Name ?? '',
+    task_type: tpl?.task_type ?? tpl?.TaskType ?? tpl?.taskType ?? '',
+    config: getTemplateConfig(tpl),
+    created_at: tpl?.created_at ?? tpl?.CreatedAt,
+    updated_at: tpl?.updated_at ?? tpl?.UpdatedAt,
+  };
+  return normalized as TemplateItem;
+};
+
 const templatesByType = computed<Record<PipelineTaskType, TemplateItem[]>>(() => {
   const base: Record<PipelineTaskType, TemplateItem[]> = {
     collect_binance: [],
@@ -84,7 +102,8 @@ const fetchTemplates = async () => {
   errorMessage.value = '';
   try {
     const { data } = await api.getTemplates();
-    templates.value = data?.data ?? data ?? [];
+    const raw = data?.data ?? data ?? [];
+    templates.value = Array.isArray(raw) ? raw.map(normalizeTemplate) : [];
   } catch (error: any) {
     errorMessage.value = error?.message ?? '模板列表获取失败';
   } finally {

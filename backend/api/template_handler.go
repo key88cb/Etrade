@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"backend/models"
 	"backend/service"
 	"backend/utils"
 
@@ -62,7 +63,11 @@ func (h *TemplateHandler) ListTemplates(c *gin.Context) {
 		utils.Fail(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	utils.Success(c, templates)
+	resp := make([]TemplateResponse, 0, len(templates))
+	for _, tpl := range templates {
+		resp = append(resp, toTemplateResponse(tpl))
+	}
+	utils.Success(c, resp)
 }
 
 // CreateTemplate 创建模板
@@ -84,7 +89,7 @@ func (h *TemplateHandler) CreateTemplate(c *gin.Context) {
 		utils.Fail(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	utils.Success(c, template)
+	utils.Success(c, toTemplateResponse(*template))
 }
 
 // UpdateTemplate 更新模板
@@ -112,7 +117,7 @@ func (h *TemplateHandler) UpdateTemplate(c *gin.Context) {
 		utils.Fail(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	utils.Success(c, template)
+	utils.Success(c, toTemplateResponse(*template))
 }
 
 // DeleteTemplate 删除模板
@@ -174,4 +179,17 @@ func parseUintParam(c *gin.Context, key string) (uint, error) {
 		return 0, err
 	}
 	return uint(id64), nil
+}
+
+func toTemplateResponse(tpl models.ParamTemplate) TemplateResponse {
+	cfg := map[string]interface{}{}
+	for k, v := range tpl.ConfigJSON {
+		cfg[k] = v
+	}
+	return TemplateResponse{
+		ID:       tpl.ID,
+		Name:     tpl.Name,
+		TaskType: tpl.TaskType,
+		Config:   cfg,
+	}
 }

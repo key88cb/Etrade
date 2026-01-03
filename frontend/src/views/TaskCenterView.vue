@@ -49,6 +49,7 @@ const errorMessage = ref('');
 
 const statusChartRef = ref<HTMLDivElement | null>(null);
 let statusChart: echarts.ECharts | null = null;
+const detailAnchorRef = ref<HTMLDivElement | null>(null);
 
 const cancelOpen = ref(false);
 const cancelReason = ref('');
@@ -94,14 +95,22 @@ const fetchTasks = async () => {
 };
 
 const viewTask = async (taskId: string) => {
+  if (!taskId) {
+    message.warning('task_id 为空');
+    return;
+  }
   selectedTask.value = null;
   taskLogs.value = [];
+  message.loading({ content: '加载任务详情…', key: 'task-detail' });
   try {
     const { data } = await api.getTaskDetail(taskId);
     selectedTask.value = data?.data ?? data;
     await fetchLogs(taskId, 5);
+    message.success({ content: '已加载任务详情', key: 'task-detail', duration: 1.2 });
+    nextTick(() => detailAnchorRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   } catch (error: any) {
     errorMessage.value = error?.message ?? '任务详情获取失败';
+    message.error({ content: errorMessage.value, key: 'task-detail' });
   }
 };
 
@@ -115,6 +124,30 @@ const fetchLogs = async (taskId: string, limit?: number) => {
     errorMessage.value = error?.message ?? '任务日志获取失败';
   } finally {
     logLoading.value = false;
+  }
+};
+
+const exportStatusChart = () => {
+  if (!statusChart) {
+    message.warning('图表未初始化');
+    return;
+  }
+  try {
+    const isDark = document.documentElement.classList.contains('dark');
+    const url = statusChart.getDataURL({
+      type: 'png',
+      pixelRatio: 2,
+      backgroundColor: isDark ? '#0d1117' : '#ffffff',
+    });
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `task-status-${Date.now()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    message.success('已导出图片');
+  } catch (err: any) {
+    message.error(err?.message ?? '导出失败');
   }
 };
 
@@ -132,7 +165,7 @@ const renderStatusChart = () => {
 
   statusChart.setOption({
     tooltip: { trigger: 'item' },
-    toolbox: { feature: { saveAsImage: {} } },
+    toolbox: { feature: { saveAsImage: { pixelRatio: 2 } } },
     legend: { bottom: 0 },
     series: [
       {
@@ -233,11 +266,14 @@ onBeforeUnmount(() => {
     </a-row>
 
     <a-row :gutter="16">
-      <a-col :xs="24" :lg="10">
-        <a-card size="small" title="状态分布" class="shadow-sm">
-          <div ref="statusChartRef" style="height: 280px;"></div>
-        </a-card>
-      </a-col>
+        <a-col :xs="24" :lg="10">
+          <a-card size="small" title="状态分布" class="shadow-sm">
+            <template #extra>
+              <a-button size="small" @click="exportStatusChart">导出图片</a-button>
+            </template>
+            <div ref="statusChartRef" style="height: 280px;"></div>
+          </a-card>
+        </a-col>
       <a-col :xs="24" :lg="14">
         <a-card size="small" title="任务列表" class="shadow-sm">
           <a-table
@@ -270,6 +306,7 @@ onBeforeUnmount(() => {
       </a-col>
     </a-row>
 
+    <div ref="detailAnchorRef"></div>
     <a-card size="small" title="任务详情" class="shadow-sm">
       <div v-if="!selectedTask" class="text-sm text-[#57606a] dark:text-[#7d8590]">在任务列表中选择一条任务</div>
       <div v-else class="space-y-3">

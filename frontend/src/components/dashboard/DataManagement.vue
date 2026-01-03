@@ -47,6 +47,7 @@ interface Template {
   id: number;
   name: string;
   task_type: string;
+  config?: Record<string, unknown>;
 }
 
 interface Report {
@@ -218,11 +219,14 @@ const templateByType = computed<Record<PipelineTaskType, any | undefined>>(() =>
   };
   templates.value.forEach((tpl) => {
     if (tpl.task_type && tpl.task_type in base) {
-      base[tpl.task_type as PipelineTaskType] = tpl;
+      const key = tpl.task_type as PipelineTaskType;
+      if (!base[key]) base[key] = tpl;
     }
   });
   return base;
 });
+
+const hasSyncedTemplateConfigs = ref(false);
 
 // --- Date Parsers ---
 const parseShanghaiDateTime = (value: string) => {
@@ -252,6 +256,81 @@ const toISODateTime = (value: string) => {
   const parsed = parseShanghaiDateTime(value);
   if (!parsed) return undefined;
   return parsed.toISOString();
+};
+
+const toFiniteNumber = (value: unknown): number | undefined => {
+  if (value == null) return undefined;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  const n = Number(String(value));
+  return Number.isFinite(n) ? n : undefined;
+};
+
+const toOptionalBoolean = (value: unknown): boolean | undefined => {
+  if (value == null) return undefined;
+  if (typeof value === 'boolean') return value;
+  const s = String(value).trim().toLowerCase();
+  if (s === 'true') return true;
+  if (s === 'false') return false;
+  return undefined;
+};
+
+const toShanghaiInputValue = (value: unknown): string => {
+  if (value == null) return '';
+  let date: Date | null = null;
+  const asNumber = toFiniteNumber(value);
+  if (asNumber != null) {
+    date = new Date(asNumber * 1000);
+  } else if (typeof value === 'string') {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) date = d;
+  }
+  if (!date || Number.isNaN(date.getTime())) return '';
+  const shanghai = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+  return shanghai.toISOString().slice(0, 19);
+};
+
+const syncTemplateConfigsFromTemplates = () => {
+  const byType = templateByType.value;
+
+  const binance = byType.collect_binance?.config ?? {};
+  if (typeof binance.csv_path === 'string') templateConfigs.collect_binance.csv_path = binance.csv_path;
+  const importPct = toFiniteNumber(binance.import_percentage);
+  if (importPct != null) templateConfigs.collect_binance.import_percentage = importPct;
+  const chunkSize = toFiniteNumber(binance.chunk_size);
+  if (chunkSize != null) templateConfigs.collect_binance.chunk_size = chunkSize;
+
+  const uniswap = byType.collect_uniswap?.config ?? {};
+  if (typeof uniswap.pool_address === 'string') templateConfigs.collect_uniswap.pool_address = uniswap.pool_address;
+  const uStart = toShanghaiInputValue(uniswap.start_ts ?? uniswap.start_date ?? uniswap.start);
+  const uEnd = toShanghaiInputValue(uniswap.end_ts ?? uniswap.end_date ?? uniswap.end);
+  if (uStart) templateConfigs.collect_uniswap.start_date = uStart;
+  if (uEnd) templateConfigs.collect_uniswap.end_date = uEnd;
+
+  const prices = byType.process_prices?.config ?? {};
+  const pStart = toShanghaiInputValue(prices.start_date ?? prices.start);
+  const pEnd = toShanghaiInputValue(prices.end_date ?? prices.end);
+  if (pStart) templateConfigs.process_prices.start_date = pStart;
+  if (pEnd) templateConfigs.process_prices.end_date = pEnd;
+  if (typeof prices.aggregation_interval === 'string') templateConfigs.process_prices.aggregation_interval = prices.aggregation_interval;
+  const overwrite = toOptionalBoolean(prices.overwrite);
+  if (overwrite != null) templateConfigs.process_prices.overwrite = overwrite;
+
+  const analyse = byType.analyse?.config ?? {};
+  const batchId = analyse.batch_id != null ? String(analyse.batch_id) : '';
+  if (batchId) templateConfigs.analyse.batch_id = batchId;
+  const aOverwrite = toOptionalBoolean(analyse.overwrite);
+  if (aOverwrite != null) templateConfigs.analyse.overwrite = aOverwrite;
+  const strategy = (analyse.strategy ?? {}) as Record<string, unknown>;
+  const profit = toFiniteNumber(strategy.profit_threshold);
+  if (profit != null) templateConfigs.analyse.strategy.profit_threshold = profit;
+  const delay = toFiniteNumber(strategy.time_delay_seconds);
+  if (delay != null) templateConfigs.analyse.strategy.time_delay_seconds = delay;
+  const invest = toFiniteNumber(strategy.initial_investment);
+  if (invest != null) templateConfigs.analyse.strategy.initial_investment = invest;
+  const aStart = toShanghaiInputValue(strategy.start);
+  const aEnd = toShanghaiInputValue(strategy.end);
+  if (aStart) templateConfigs.analyse.strategy.start = aStart;
+  if (aEnd) templateConfigs.analyse.strategy.end = aEnd;
 };
 
 const buildOverrides = (taskType: PipelineTaskType): Record<string, unknown> => {
@@ -304,9 +383,12 @@ const downloadReport = (reportId: number) => {
 };
 
 const pickLatestTemplateByType = (taskType: string): Template | undefined => {
-  const matches = templates.value.filter((t) => t.task_type === taskType);
-  if (matches.length === 0) return undefined;
-  return matches.reduce((best, cur) => (cur.id > best.id ? cur : best), matches[0]);
+  let best: Template | undefined;
+  for (const tpl of templates.value) {
+    if (tpl.task_type !== taskType) continue;
+    if (!best || tpl.id > best.id) best = tpl;
+  }
+  return best;
 };
 
 const ensureTemplateByType = async (taskType: string): Promise<Template> => {
@@ -372,7 +454,7 @@ const fetchAllData = async () => {
   await Promise.all([fetchControlData(), fetchBatches(), fetchReports()]);
 };
 
-const fetchControlData = async () => {
+const fetchControlData = async (forceSync = false) => {
   isLoadingControl.value = true;
   try {
     const [taskRes, templateRes] = await Promise.all([
@@ -382,11 +464,19 @@ const fetchControlData = async () => {
     remoteTasks.value = taskRes.data?.data?.items ?? [];
     const rawTemplates = templateRes.data?.data ?? templateRes.data ?? [];
     templates.value = rawTemplates.map((t: any) => normalizeTemplate(t));
+    if (forceSync || !hasSyncedTemplateConfigs.value) {
+      syncTemplateConfigsFromTemplates();
+      hasSyncedTemplateConfigs.value = true;
+    }
   } catch (e: any) {
     controlError.value = e.message;
   } finally {
     isLoadingControl.value = false;
   }
+};
+
+const reloadControlData = async () => {
+  await fetchControlData(true);
 };
 
 const fetchBatches = async () => {
@@ -744,7 +834,7 @@ onMounted(fetchAllData);
       <div class="rounded-md border p-4 space-y-3" :class="isDark ? 'bg-[#161b22] border-[#30363d]' : 'bg-white border-[#d0d7de]'">
         <div class="flex items-center justify-between">
           <h3 :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">Template Actions</h3>
-          <button class="text-xs" :class="isDark ? 'text-[#58a6ff]' : 'text-[#0969da]'" @click="fetchControlData">Reload</button>
+          <button class="text-xs" :class="isDark ? 'text-[#58a6ff]' : 'text-[#0969da]'" @click="reloadControlData">Reload</button>
         </div>
         <div v-if="templates.length === 0" class="text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">暂无模板。</div>
         <div v-for="template in templates.slice(0, 3)" :key="template.id" class="border rounded px-3 py-2 space-y-1" :class="isDark ? 'border-[#30363d]' : 'border-[#d0d7de]'">

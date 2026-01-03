@@ -69,6 +69,7 @@ export interface ExperimentPayload {
 const api = {
   getOpportunities: (params?: OpportunitiesParams) =>
     instance.get('/opportunities', { params }),
+  analyzeOpportunity: (id: number) => instance.post(`/opportunities/${id}/analyze`), 
   getPriceComparisonData: (params: PriceComparisonParams) =>
     instance.get('/price-comparison', { params }),
   getTasks: (params?: TaskListParams) => instance.get('/tasks', { params }),

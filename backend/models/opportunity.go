@@ -17,6 +17,7 @@ type ArbitrageOpportunity struct {
 	ProfitUSDT      float64           `json:"profit_usdt" gorm:"not null"`
 	DetailsJSON     datatypes.JSONMap `json:"details,omitempty" gorm:"type:jsonb" swaggertype:"object"`
 	RiskMetricsJSON datatypes.JSONMap `json:"risk_metrics,omitempty" gorm:"type:jsonb" swaggertype:"object"`
+	LLMAnalysisJSON datatypes.JSONMap `json:"llm_analysis,omitempty" gorm:"type:jsonb" swaggertype:"object"`
 	CreatedAt       time.Time         `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt       time.Time         `json:"updated_at" gorm:"autoUpdateTime"`
 }

@@ -311,16 +311,19 @@ func (s *ReportService) GenerateReportFile(reportID uint, batchID uint, format s
 		})
 	}
 
+	// Maroto 的 TableList 使用 12 栅格布局；GridSizes 总和必须 <= 12，否则会导致右侧内容溢出/被裁切。
+	gridSizes := []uint{1, 1, 1, 2, 2, 2, 1, 2} // sum=12
+
 	m.TableList(headers, rows, props.TableList{
 		HeaderProp: props.TableListContent{
 			Size: 8.5,
-			GridSizes: []uint{1, 2, 2, 2, 2, 2, 1, 2},
+			GridSizes: gridSizes,
 			Style: consts.Bold,
 			Color: color.NewBlack(),
 		},
 		ContentProp: props.TableListContent{
 			Size: 8.5,
-			GridSizes: []uint{1, 2, 2, 2, 2, 2, 1, 2},
+			GridSizes: gridSizes,
 			CellTextColorChangerColumnIndex: 5,
 			CellTextColorChangerFunc: func(cellValue string) color.Color {
 				// Profit column coloring

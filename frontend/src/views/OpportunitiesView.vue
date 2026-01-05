@@ -1418,6 +1418,9 @@ const renderDetailCharts = async () => {
     }
     const start = bt - 15 * 60 * 1000;
     const end = bt + 15 * 60 * 1000;
+    const viewPad = 5 * 60 * 1000;
+    const viewStart = bt - viewPad;
+    const viewEnd = bt + viewPad;
     try {
       const { data } = await api.getPriceComparisonData({ startTime: start, endTime: end });
       const payload = data?.data ?? {};
@@ -1440,20 +1443,42 @@ const renderDetailCharts = async () => {
         return 'unknown';
       };
 
-      const nearestPoint = (series: Array<[number, number]>, targetTime: number) => {
-        let best: [number, number] | null = null;
-        let bestDist = Number.POSITIVE_INFINITY;
-        for (const pt of series) {
-          const t = Number(pt?.[0]);
-          const y = Number(pt?.[1]);
-          if (!Number.isFinite(t) || !Number.isFinite(y)) continue;
-          const dist = Math.abs(t - targetTime);
-          if (dist < bestDist) {
-            bestDist = dist;
-            best = [t, y];
-          }
+      const sortSeries = (series: Array<[number, number]>) =>
+        series
+          .map((pt) => [Number(pt?.[0]), Number(pt?.[1])] as [number, number])
+          .filter((pt) => Number.isFinite(pt[0]) && Number.isFinite(pt[1]))
+          .sort((a, b) => a[0] - b[0]);
+
+      // 给定时间戳，在线段上做线性插值，保证标注点“落在折线上”且买卖时间不重合。
+      const interpolatedPoint = (series: Array<[number, number]>, targetTime: number) => {
+        const s = sortSeries(series);
+        if (!s.length || !Number.isFinite(targetTime)) return null;
+
+        const first = s[0]!;
+        const last = s[s.length - 1]!;
+        if (targetTime <= first[0]) return [targetTime, first[1]] as [number, number];
+        if (targetTime >= last[0]) return [targetTime, last[1]] as [number, number];
+
+        let lo = 0;
+        let hi = s.length - 1;
+        while (lo + 1 < hi) {
+          const mid = Math.floor((lo + hi) / 2);
+          const t = s[mid]![0];
+          if (t === targetTime) return [targetTime, s[mid]![1]] as [number, number];
+          if (t < targetTime) lo = mid;
+          else hi = mid;
         }
-        return best;
+
+        const a = s[lo]!;
+        const b = s[hi]!;
+        const t0 = a[0];
+        const t1 = b[0];
+        const y0 = a[1];
+        const y1 = b[1];
+        if (t1 === t0) return [targetTime, y0] as [number, number];
+        const w = (targetTime - t0) / (t1 - t0);
+        const y = y0 + (y1 - y0) * w;
+        return [targetTime, y] as [number, number];
       };
 
       const isDarkTheme = document.documentElement.classList.contains('dark');
@@ -1467,11 +1492,12 @@ const renderDetailCharts = async () => {
       const buyOnBinance = buyKey === 'binance' || (buyKey === 'unknown' && binance.length && !uniswap.length);
       const sellOnBinance = sellKey === 'binance' || (sellKey === 'unknown' && binance.length && !uniswap.length);
 
-      const buySeries = buyOnBinance ? binance : uniswap;
-      const sellSeries = sellOnBinance ? binance : uniswap;
+      const buySeries = buyOnBinance && binance.length ? binance : (uniswap.length ? uniswap : binance);
+      const sellSeries = sellOnBinance && binance.length ? binance : (uniswap.length ? uniswap : binance);
 
-      const buyCoord = nearestPoint(buySeries, buyTime);
-      const sellCoord = nearestPoint(sellSeries, sellTime);
+      // 关键：使用“目标时间戳”的插值点，避免聚合粒度较粗时 BUY/SELL 落到同一时间桶导致看起来“原子化”。
+      const buyCoord = interpolatedPoint(buySeries, buyTime);
+      const sellCoord = interpolatedPoint(sellSeries, sellTime);
 
       const buyMark = (coord: [number, number]) => ({
         name: 'BUY',
@@ -1511,13 +1537,14 @@ const renderDetailCharts = async () => {
       const binanceMarks: any[] = [];
       if (buyCoord) (buyOnBinance ? binanceMarks : uniswapMarks).push(buyMark(buyCoord));
       if (sellCoord) (sellOnBinance ? binanceMarks : uniswapMarks).push(sellMark(sellCoord));
+      const deltaSeconds = Math.max(1, Math.round((sellTime - buyTime) / 1000));
       miniPriceChart?.setOption({
         tooltip: { trigger: 'axis' },
         legend: { top: 0, data: ['Uniswap', 'Binance'] },
         grid: { left: 50, right: 18, top: 30, bottom: 30 },
-        xAxis: { type: 'time' },
+        xAxis: { type: 'time', min: viewStart, max: viewEnd },
         yAxis: { type: 'value', scale: true },
-        dataZoom: [{ type: 'inside' }],
+        dataZoom: [{ type: 'inside', startValue: viewStart, endValue: viewEnd }],
         series: [
           {
             name: 'Uniswap',
@@ -1528,15 +1555,6 @@ const renderDetailCharts = async () => {
             markPoint: uniswapMarks.length
               ? { symbol: 'circle', symbolSize: 12, data: uniswapMarks }
               : undefined,
-            markLine:
-              buyCoord && sellCoord
-                ? {
-                    silent: true,
-                    symbol: 'none',
-                    lineStyle: { type: 'dashed', opacity: 0.6, color: labelBorder },
-                    data: [[{ coord: buyCoord }, { coord: sellCoord }]] as any,
-                  }
-                : undefined,
           },
           {
             name: 'Binance',
@@ -1548,6 +1566,34 @@ const renderDetailCharts = async () => {
               ? { symbol: 'circle', symbolSize: 12, data: binanceMarks }
               : undefined,
           },
+          // 执行时间线（强调非原子：BUY 早于 SELL）
+          ...(buyCoord && sellCoord
+            ? [
+                {
+                  name: '__execution__',
+                  type: 'line',
+                  data: [] as any[],
+                  showSymbol: false,
+                  lineStyle: { opacity: 0 },
+                  markLine: {
+                    silent: true,
+                    symbol: ['none', 'arrow'],
+                    lineStyle: { type: 'dashed', opacity: 0.6, color: labelBorder },
+                    label: {
+                      show: true,
+                      formatter: `+${deltaSeconds}s`,
+                      color: labelText,
+                      backgroundColor: labelBg,
+                      borderColor: labelBorder,
+                      borderWidth: 1,
+                      borderRadius: 4,
+                      padding: [3, 6],
+                    },
+                    data: [[{ coord: buyCoord }, { coord: sellCoord }]] as any,
+                  },
+                },
+              ]
+            : []),
         ],
       });
       miniPriceChart?.resize();

@@ -109,19 +109,7 @@ onBeforeUnmount(() => {
               >
                 价格对比
               </button>
-              <button
-                type="button"
-                @click="toggleTheme"
-                :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
-                :class="[
-                  'p-2 rounded-md transition-colors border',
-                  isDark
-                    ? 'bg-[#21262d] border-[#30363d] text-[#7d8590] hover:text-[#e6edf3] hover:border-[#58a6ff]'
-                    : 'bg-[#f6f8fa] border-[#d0d7de] text-[#57606a] hover:text-[#24292f] hover:border-[#0969da]',
-                ]"
-              >
-                <component :is="isDark ? Sun : Moon" class="w-4 h-4" />
-              </button>
+
 
               <div
                 class="flex items-center gap-2 px-2.5 py-1 rounded-md"

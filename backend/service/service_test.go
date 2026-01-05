@@ -22,7 +22,7 @@ func TestGetOpportunitiesSupportsPaginationAndOrdering(t *testing.T) {
 	}
 	require.NoError(t, db.Create(&seed).Error)
 
-	ops, pagination, err := svc.GetOpportunities(1, 2, "profit_usdt", "desc")
+	ops, pagination, err := svc.GetOpportunities(1, 2, "profit_usdt", "desc", nil)
 	require.NoError(t, err)
 	require.NotNil(t, pagination)
 
@@ -33,7 +33,7 @@ func TestGetOpportunitiesSupportsPaginationAndOrdering(t *testing.T) {
 	assert.Equal(t, uint(2), ops[0].ID)
 	assert.Equal(t, uint(1), ops[1].ID)
 
-	opsPage2, _, err := svc.GetOpportunities(2, 2, "profit_usdt", "desc")
+	opsPage2, _, err := svc.GetOpportunities(2, 2, "profit_usdt", "desc", nil)
 	require.NoError(t, err)
 	require.Len(t, opsPage2, 1)
 	assert.Equal(t, uint(3), opsPage2[0].ID)
@@ -76,7 +76,7 @@ func TestGetOpportunitiesPropagatesDBError(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, sqlDB.Close())
 
-	_, _, err = svc.GetOpportunities(1, 1, "profit_usdt", "asc")
+	_, _, err = svc.GetOpportunities(1, 1, "profit_usdt", "asc", nil)
 	require.Error(t, err)
 }
 

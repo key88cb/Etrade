@@ -146,6 +146,12 @@ func TestBatchHandlerLifecycle(t *testing.T) {
 	decodeData(t, resp.Data, &updated)
 	require.Equal(t, "Batch B", updated.Name)
 	require.NotNil(t, updated.LastRefreshedAt)
+
+	_, resp = invokeJSONHandler(t, handler.DeleteBatch, http.MethodDelete, fmt.Sprintf("/batches/%d", batch.ID), nil, params)
+	require.Equal(t, http.StatusOK, resp.Code)
+
+	_, resp = invokeJSONHandler(t, handler.GetBatch, http.MethodGet, fmt.Sprintf("/batches/%d", batch.ID), nil, params)
+	require.Equal(t, http.StatusNotFound, resp.Code)
 }
 
 func TestTaskHandlerEndpoints(t *testing.T) {

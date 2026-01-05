@@ -225,7 +225,7 @@ onBeforeUnmount(() => {
     <div class="flex items-center justify-between">
       <div>
         <div class="text-xl font-semibold text-[#24292f] dark:text-[#e6edf3]">任务中心</div>
-        <div class="text-sm text-[#57606a] dark:text-[#7d8590]">查看任务状态、时间线与日志（支持取消任务）</div>
+        <div class="text-sm text-[#57606a] dark:text-[#7d8590]">查看任务状态、时间线与日志</div>
       </div>
       <a-button type="primary" :loading="loading" @click="fetchTasks">刷新</a-button>
     </div>

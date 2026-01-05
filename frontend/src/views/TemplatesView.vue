@@ -561,6 +561,9 @@ onBeforeUnmount(() => {
                   <div class="pt-1">
                     <a-switch v-model:checked="quickParams.analyse.overwrite" />
                   </div>
+                  <div class="text-[11px] text-[#57606a] dark:text-[#7d8590] mt-1">
+                    仅覆盖当前 <span class="font-mono">batch_id</span> 的历史结果
+                  </div>
                 </a-col>
               </a-row>
             </a-col>

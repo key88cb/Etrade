@@ -1,12 +1,14 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"backend/service"
 	"backend/utils"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type BatchHandler struct {
@@ -23,6 +25,7 @@ func (h *BatchHandler) Register(rg *gin.RouterGroup) {
 	rg.POST("/batches", h.CreateBatch)
 	rg.GET("/batches/:id", h.GetBatch)
 	rg.PUT("/batches/:id", h.UpdateBatch)
+	rg.DELETE("/batches/:id", h.DeleteBatch)
 }
 
 type batchRequest struct {
@@ -115,4 +118,27 @@ func (h *BatchHandler) UpdateBatch(c *gin.Context) {
 		return
 	}
 	utils.Success(c, batch)
+}
+
+// DeleteBatch 删除批次
+// @Summary 删除批次
+// @Tags    Batch
+// @Param   id path int true "批次 ID"
+// @Success 200 {object} map[string]string
+// @Router  /batches/{id} [delete]
+func (h *BatchHandler) DeleteBatch(c *gin.Context) {
+	id, err := parseUintParam(c, "id")
+	if err != nil {
+		utils.Fail(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := h.service.DeleteBatch(c.Request.Context(), id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			utils.Fail(c, http.StatusNotFound, err.Error())
+			return
+		}
+		utils.Fail(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.Success(c, gin.H{"message": "deleted"})
 }

@@ -72,6 +72,19 @@ const refreshBatch = async (batch: BatchItem) => {
   }
 };
 
+const deleteBatch = async (batch: BatchItem) => {
+  if (!confirm(`确定删除批次 "${batch.name}"（ID: ${batch.id}）？这会同时删除该批次下的报告/实验记录，且无法恢复。`)) {
+    return;
+  }
+  try {
+    await api.deleteBatch(batch.id);
+    if (selectedBatch.value?.id === batch.id) selectedBatch.value = null;
+    await fetchBatches();
+  } catch (error: any) {
+    errorMessage.value = error?.message ?? '删除批次失败';
+  }
+};
+
 onMounted(fetchBatches);
 
 const renderChart = () => {
@@ -207,6 +220,12 @@ onBeforeUnmount(() => {
             @click="refreshBatch(batch)"
           >
             刷新
+          </button>
+          <button
+            class="text-red-600 text-xs hover:underline"
+            @click="deleteBatch(batch)"
+          >
+            删除
           </button>
         </div>
       </div>

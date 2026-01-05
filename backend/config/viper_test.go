@@ -13,9 +13,17 @@ func TestReadConfigFileLoadsValues(t *testing.T) {
 	viper.Reset()
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
-	root := filepath.Dir(cwd)
 
-	require.NoError(t, os.Chdir(root))
+	tempDir := t.TempDir()
+	configDir := filepath.Join(tempDir, "config")
+	require.NoError(t, os.MkdirAll(configDir, 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(configDir, "config.yaml"),
+		[]byte("db:\n  host: localhost\n"),
+		0o644,
+	))
+
+	require.NoError(t, os.Chdir(tempDir))
 	t.Cleanup(func() {
 		_ = os.Chdir(cwd)
 		viper.Reset()

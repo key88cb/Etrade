@@ -5,6 +5,7 @@ import (
 	"backend/service"
 	"backend/utils"
 	"net/http"
+	"strings"
 	"strconv" // 导入 strconv
 
 	"backend/db"
@@ -61,6 +62,32 @@ func (h *Handler) GetOpportunities(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	sortBy := c.DefaultQuery("sort_by", "profit_usdt")
 	order := c.DefaultQuery("order", "desc")
+	batchIDStr := strings.TrimSpace(c.Query("batch_id"))
+	batchIDsStr := strings.TrimSpace(c.Query("batch_ids"))
+
+	var batchIDs []uint
+	if batchIDStr != "" {
+		id64, err := strconv.ParseUint(batchIDStr, 10, 64)
+		if err != nil || id64 == 0 {
+			utils.Fail(c, http.StatusBadRequest, "batch_id 参数格式错误")
+			return
+		}
+		batchIDs = append(batchIDs, uint(id64))
+	}
+	if batchIDsStr != "" {
+		for _, part := range strings.Split(batchIDsStr, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			id64, err := strconv.ParseUint(part, 10, 64)
+			if err != nil || id64 == 0 {
+				utils.Fail(c, http.StatusBadRequest, "batch_ids 参数格式错误（应为逗号分隔的数字）")
+				return
+			}
+			batchIDs = append(batchIDs, uint(id64))
+		}
+	}
 
 	// (简单验证，防止SQL注入)
 	if order != "asc" && order != "desc" {
@@ -70,7 +97,7 @@ func (h *Handler) GetOpportunities(c *gin.Context) {
 	// (应该有一个允许的 sortBy 字段白名单)
 
 	// --- service 调用 ---
-	opportunities, pagination, err := h.service.GetOpportunities(page, limit, sortBy, order)
+	opportunities, pagination, err := h.service.GetOpportunities(page, limit, sortBy, order, batchIDs)
 	if err != nil {
 		utils.Fail(c, http.StatusInternalServerError, err.Error())
 		return // 增加一个 return

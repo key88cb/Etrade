@@ -22,16 +22,21 @@ func (s *Service) DB() *gorm.DB {
 }
 
 // 添加了分页和排序参数
-func (s *Service) GetOpportunities(page, limit int, sortBy, order string) ([]models.ArbitrageOpportunity, *models.PaginationData, error) {
+func (s *Service) GetOpportunities(page, limit int, sortBy, order string, batchIDs []uint) ([]models.ArbitrageOpportunity, *models.PaginationData, error) {
 	var opportunities []models.ArbitrageOpportunity
 	var paginationData *models.PaginationData
 
 	// 计算分页
 	offset := (page - 1) * limit
 
+	tx := s.db.Model(&models.ArbitrageOpportunity{})
+	if len(batchIDs) > 0 {
+		tx = tx.Where("batch_id IN ?", batchIDs)
+	}
+
 	// 计算总数
 	var total int64
-	if err := s.db.Model(&models.ArbitrageOpportunity{}).Count(&total).Error; err != nil {
+	if err := tx.Count(&total).Error; err != nil {
 		return nil, nil, err
 	}
 
@@ -45,7 +50,7 @@ func (s *Service) GetOpportunities(page, limit int, sortBy, order string) ([]mod
 	orderBy := fmt.Sprintf("%s %s", sortBy, order)
 
 	// 执行带分页和排序的查询
-	err := s.db.Order(orderBy).Offset(offset).Limit(limit).Find(&opportunities).Error
+	err := tx.Order(orderBy).Offset(offset).Limit(limit).Find(&opportunities).Error
 
 	return opportunities, paginationData, err
 }

@@ -79,7 +79,7 @@ const subtleTextClass = computed(() => (isDark.value ? 'text-[#7d8590]' : 'text-
             <div class="flex items-center gap-2">
               <h1 class="text-base font-semibold" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">Etrade</h1>
             </div>
-            <p class="text-xs" :class="subtleTextClass">CEX ↔ DEX 历史套利分析平台</p>
+            <p class="text-xs" :class="subtleTextClass">CEX↔DEX 分析</p>
           </div>
         </div>
 
@@ -116,12 +116,12 @@ const subtleTextClass = computed(() => (isDark.value ? 'text-[#7d8590]' : 'text-
       <section class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
         <div class="space-y-6">
           <div class="space-y-3">
-            <p class="text-sm" :class="subtleTextClass">Web 界面入口</p>
+            <p class="text-sm" :class="subtleTextClass"></p>
             <h2 class="text-3xl sm:text-4xl font-semibold leading-tight" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">
-              Etrade · CEX ↔ DEX 历史套利分析平台
+              Etrade · CEX↔DEX 分析
             </h2>
             <p class="text-base leading-relaxed" :class="subtleTextClass">
-              按 “任务 → 批次 → 机会 → 详情 → 报告” 的流程使用系统。下面给出一个最短操作路径。
+              按 “任务 → 批次 → 机会 → 详情 → 报告” 使用系统。
             </p>
           </div>
 
@@ -180,7 +180,7 @@ const subtleTextClass = computed(() => (isDark.value ? 'text-[#7d8590]' : 'text-
             <div class="p-5 border-b flex items-center justify-between" :class="isDark ? 'border-[#30363d]' : 'border-[#d0d7de]'">
               <div>
                 <div class="text-sm font-medium" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">系统组成</div>
-                <div class="text-xs" :class="subtleTextClass">Control Plane / Data Plane 拆分</div>
+                <div class="text-xs" :class="subtleTextClass"></div>
               </div>
               <Blocks class="w-5 h-5" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'" />
             </div>

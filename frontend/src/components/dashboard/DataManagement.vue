@@ -800,7 +800,7 @@ onMounted(fetchAllData);
                 </template>
                 <template v-else>
                   <label :class="[labelTextClass, 'flex flex-col gap-1']"><span>Batch ID（可选）</span><input type="text" inputmode="numeric" placeholder="留空自动创建批次" v-model="templateConfigs.analyse.batch_id" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" /></label>
-                  <label :class="[labelTextClass, 'flex items-center gap-2']"><input type="checkbox" v-model="templateConfigs.analyse.overwrite" />覆盖批次</label>
+                  <label :class="[labelTextClass, 'flex items-center gap-2']"><input type="checkbox" v-model="templateConfigs.analyse.overwrite" />覆盖当前批次（仅 batch_id）</label>
                   <label :class="[labelTextClass, 'flex flex-col gap-1']">
                     <span>分析开始时间</span>
                     <input type="datetime-local" step="1" v-model="templateConfigs.analyse.strategy.start" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />

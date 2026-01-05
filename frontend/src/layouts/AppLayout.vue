@@ -50,7 +50,8 @@ type MenuKey =
   | '/app/batches'
   | '/app/opportunities'
   | '/app/reports'
-  | '/app/templates';
+  | '/app/templates'
+  | '/app/overview';
 
 const selectedKey = computed<MenuKey>(() => {
   const path = route.path;
@@ -60,6 +61,7 @@ const selectedKey = computed<MenuKey>(() => {
     '/app/opportunities',
     '/app/reports',
     '/app/templates',
+    '/app/overview',
   ];
   const match = candidates.find((k) => path === k || path.startsWith(`${k}/`));
   return match ?? '/app/opportunities';
@@ -74,7 +76,7 @@ const onMenuClick = (e: any) => {
 };
 
 const goPriceComparison = () => router.push('/app/comparison');
-const goRunTask = () => router.push('/app/templates');
+const goRunTask = () => router.push('/app/overview');
 
 const configTheme = computed(() => ({
   algorithm: isDark.value ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
@@ -124,7 +126,7 @@ const secondaryButtonClass = computed(() =>
           </div>
           <div v-if="!collapsed" class="leading-tight">
             <div :class="['text-sm font-semibold', isDark ? 'text-[#e6edf3]' : 'text-[#24292f]']">Etrade</div>
-            <div :class="['text-xs', headerSubtleClass]">CEX↔DEX 分析平台</div>
+            <div :class="['text-xs', headerSubtleClass]">CEX↔DEX 分析</div>
           </div>
         </div>
 
@@ -155,6 +157,10 @@ const secondaryButtonClass = computed(() =>
             <template #icon><DatabaseOutlined /></template>
             模板
           </a-menu-item>
+          <a-menu-item key="/app/overview">
+            <template #icon><PlayCircleOutlined /></template>
+            运行任务
+          </a-menu-item>
         </a-menu>
       </a-layout-sider>
 
@@ -167,7 +173,7 @@ const secondaryButtonClass = computed(() =>
           ]"
           style="height: 56px; line-height: 56px"
         >
-          <div class="text-sm" :class="headerSubtleClass">任务 → 批次 → 机会 → 详情 → 报告</div>
+          <div class="text-sm" :class="headerSubtleClass"></div>
           <div class="flex items-center gap-3">
             <div class="text-xs" :class="headerSubtleClass">{{ route.meta?.title ?? route.name }}</div>
             <button
@@ -185,7 +191,7 @@ const secondaryButtonClass = computed(() =>
               class="px-3 py-1.5 rounded-md text-sm transition-colors inline-flex items-center gap-2"
               :class="secondaryButtonClass"
               @click="goRunTask"
-              title="到模板页运行任务"
+              title="打开概览页运行任务"
             >
               <PlayCircleOutlined />
               运行任务

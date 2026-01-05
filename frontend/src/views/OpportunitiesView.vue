@@ -30,7 +30,7 @@
       />
 
       <a-row :gutter="16">
-        <a-col :xs="24" :lg="6">
+        <a-col :xs="24" :lg="7" :xl="6" :xxl="5">
           <a-card title="批次管理" size="small" class="side-card" :loading="batchesLoading">
             <a-list
               :data-source="batches"
@@ -196,7 +196,7 @@
           </a-card>
         </a-col>
 
-        <a-col :xs="24" :lg="18">
+        <a-col :xs="24" :lg="17" :xl="18" :xxl="19">
           <div class="active-batch-header">
             <div>
               <h3>批次概览</h3>
@@ -287,32 +287,51 @@
           </a-row>
 
           <a-row :gutter="16" class="mb-4" v-if="!loading">
-            <a-col :xs="24" :lg="8">
+            <a-col :xs="24" :xl="12">
               <a-card size="small" title="利润分布" class="shadow-sm">
-                <div ref="profitHistRef" style="height: 240px;"></div>
+                <div ref="profitHistRef" style="height: 320px;"></div>
               </a-card>
             </a-col>
-            <a-col :xs="24" :lg="8">
+            <a-col :xs="24" :xl="12">
               <a-card size="small" title="利润 vs 风险 (Scatter)" class="shadow-sm">
-                <div ref="profitRiskScatterRef" style="height: 240px;"></div>
+                <div ref="profitRiskScatterRef" style="height: 320px;"></div>
               </a-card>
             </a-col>
-            <a-col :xs="24" :lg="8">
+          </a-row>
+
+          <a-row :gutter="16" class="mb-4" v-if="!loading">
+            <a-col :xs="24">
               <a-card size="small" title="利润随时间" class="shadow-sm">
-                <div ref="profitTimeRef" style="height: 240px;"></div>
+                <div ref="profitTimeRef" style="height: 320px;"></div>
               </a-card>
             </a-col>
           </a-row>
 
           <a-row :gutter="16" class="mb-4" v-if="!loading && openedBatchIds.length">
-            <a-col :xs="24" :lg="14">
-              <a-card size="small" title="多批次利润分布对比（Boxplot）" class="shadow-sm">
-                <div ref="batchProfitCompareRef" style="height: 260px;"></div>
+            <a-col :xs="24" :xl="12">
+              <a-card size="small" title="多批次利润分布对比" class="shadow-sm">
+                <div ref="batchProfitCompareRef" style="height: 320px;"></div>
               </a-card>
             </a-col>
-            <a-col :xs="24" :lg="10">
+            <a-col :xs="24" :xl="12">
               <a-card size="small" title="多批次平均风险对比" class="shadow-sm">
-                <div ref="batchRiskCompareRef" style="height: 260px;"></div>
+                <div ref="batchRiskCompareRef" style="height: 320px;"></div>
+              </a-card>
+            </a-col>
+          </a-row>
+
+          <a-row :gutter="16" class="mb-4" v-if="!loading && openedBatchIds.length">
+            <a-col :xs="24" :xl="12">
+              <a-card size="small" title="批次对比（总利润 / 均值 / 数量）" class="shadow-sm">
+                <div v-if="openedBatchIds.length < 2" class="text-sm text-gray-500 py-8 text-center">
+                  请至少打开 2 个批次以进行对比
+                </div>
+                <div v-else ref="batchExperimentCompareRef" style="height: 320px;"></div>
+              </a-card>
+            </a-col>
+            <a-col :xs="24" :xl="12">
+              <a-card size="small" title="路径占比（Buy → Sell）" class="shadow-sm">
+                <div ref="pathSharePieRef" style="height: 320px;"></div>
               </a-card>
             </a-col>
           </a-row>
@@ -778,12 +797,16 @@ const profitRiskScatterRef = ref<HTMLDivElement | null>(null);
 const profitTimeRef = ref<HTMLDivElement | null>(null);
 const batchProfitCompareRef = ref<HTMLDivElement | null>(null);
 const batchRiskCompareRef = ref<HTMLDivElement | null>(null);
+const batchExperimentCompareRef = ref<HTMLDivElement | null>(null);
+const pathSharePieRef = ref<HTMLDivElement | null>(null);
 
 let profitHistChart: echarts.ECharts | null = null;
 let profitRiskChart: echarts.ECharts | null = null;
 let profitTimeChart: echarts.ECharts | null = null;
 let batchProfitCompareChart: echarts.ECharts | null = null;
 let batchRiskCompareChart: echarts.ECharts | null = null;
+let batchExperimentCompareChart: echarts.ECharts | null = null;
+let pathSharePieChart: echarts.ECharts | null = null;
 
 const detailsOpen = ref(false);
 const selectedOpp = ref<Opportunity | null>(null);
@@ -915,27 +938,56 @@ const fetchOpportunities = async () => {
   error.value = null;
   
   try {
-    const response = await api.getOpportunities();
-    
-    if (response.data && response.data.code === 200) {
-      const data = response.data.data;
-      // 兼容后端返回 { items: [], pagination: {} } 或直接返回 [] 的情况
-      const normalizeItem = (raw: any): Opportunity => ({
-        ...raw,
-        details: raw?.details ?? raw?.DetailsJSON ?? raw?.details_json ?? undefined,
-        risk_metrics: raw?.risk_metrics ?? raw?.RiskMetricsJSON ?? raw?.risk_metrics_json ?? raw?.riskMetrics ?? undefined,
-      });
-      if (Array.isArray(data)) {
-        allOpportunities.value = data.map(normalizeItem);
-      } else if (data && Array.isArray(data.items)) {
-        allOpportunities.value = data.items.map(normalizeItem);
-      } else {
-        allOpportunities.value = [];
-      }
-    } else {
-      error.value = response.data?.message || '获取数据失败，请检查数据格式';
+    const ids = openedBatchIds.value;
+    if (!ids.length) {
       allOpportunities.value = [];
+      return;
     }
+
+    // 为了避免“批次里很多机会，但只显示少量”的问题，这里按已打开批次拉取机会数据。
+    // 使用分页循环把该批次(们)的全部机会拉回来，再由前端做展示分页。
+    const pageSize = 200;
+    let page = 1;
+    let total = 0;
+    const collected: Opportunity[] = [];
+
+    while (true) {
+      const response = await api.getOpportunities({
+        page,
+        limit: pageSize,
+        sort_by: 'profit_usdt',
+        order: 'desc',
+        batch_ids: ids.join(','),
+      });
+    
+      if (response.data && response.data.code === 200) {
+        const data = response.data.data;
+        // 兼容后端返回 { items: [], pagination: {} } 或直接返回 [] 的情况
+        const normalizeItem = (raw: any): Opportunity => ({
+          ...raw,
+          details: raw?.details ?? raw?.DetailsJSON ?? raw?.details_json ?? undefined,
+          risk_metrics: raw?.risk_metrics ?? raw?.RiskMetricsJSON ?? raw?.risk_metrics_json ?? raw?.riskMetrics ?? undefined,
+        });
+
+        const items = Array.isArray(data) ? data : (data?.items ?? []);
+        const normalized = Array.isArray(items) ? items.map(normalizeItem) : [];
+        collected.push(...normalized);
+        total = Number(data?.pagination?.total ?? data?.pagination?.Total ?? normalized.length ?? 0);
+
+        if (!normalized.length) break;
+        if (total && collected.length >= total) break;
+        if (normalized.length < pageSize) break;
+
+        page += 1;
+        if (page > 200) break; // 防止异常导致死循环
+      } else {
+        error.value = response.data?.message || '获取数据失败，请检查数据格式';
+        allOpportunities.value = [];
+        break;
+      }
+    }
+
+    allOpportunities.value = collected;
   } catch (err: any) {
     console.error('获取套利机会失败:', err);
     error.value = err.message || '网络请求失败，请检查后端服务是否可用';
@@ -946,9 +998,18 @@ const fetchOpportunities = async () => {
     nextTick(() => {
       renderOverviewCharts();
       renderBatchCompareCharts();
+      renderBatchAnalysisCharts();
     });
   }
 };
+
+watch(
+  () => openedBatchIds.value.slice(),
+  () => {
+    // 只要打开/关闭批次，就重新拉取对应批次的机会数据
+    fetchOpportunities();
+  },
+);
 
 const ensureChart = (el: HTMLDivElement | null, instance: echarts.ECharts | null) => {
   if (!el) return null;
@@ -1025,8 +1086,9 @@ const renderOverviewCharts = () => {
           data: points,
           symbolSize: (val: any) => {
             const volume = Number(val[2] ?? 0);
-            return Math.max(6, Math.min(24, Math.sqrt(volume) * 4));
+            return Math.max(3, Math.min(14, Math.sqrt(volume) * 2));
           },
+          itemStyle: { opacity: 0.7 },
         },
       ],
     });
@@ -1147,6 +1209,96 @@ const renderBatchCompareCharts = () => {
       });
     }
   }
+};
+
+const renderBatchAnalysisCharts = () => {
+  // 1) 批次对比（总利润 / 均值 / 数量）
+  if (openedBatchIds.value.length < 2 || !batchExperimentCompareRef.value) {
+    batchExperimentCompareChart?.dispose();
+    batchExperimentCompareChart = null;
+  } else {
+    batchExperimentCompareChart = ensureChart(batchExperimentCompareRef.value, batchExperimentCompareChart);
+    if (batchExperimentCompareChart) {
+      const ids = openedBatchIds.value.slice().sort((a, b) => a - b);
+      const stats = ids.map((batchId) => {
+        const batchOps = opportunities.value.filter((o) => o.batch_id === batchId);
+        const totalProfit = batchOps.reduce((sum, o) => sum + (o.profit_usdt || 0), 0);
+        const count = batchOps.length;
+        const avgProfit = count > 0 ? totalProfit / count : 0;
+        const batch = batches.value.find((b) => b.id === batchId);
+        const name = batch?.name ? batch.name : `Batch #${batchId}`;
+        return { name, totalProfit, avgProfit, count };
+      });
+
+      batchExperimentCompareChart.setOption({
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        toolbox: { feature: { restore: {}, saveAsImage: {} } },
+        legend: { top: 0 },
+        grid: { left: 44, right: 44, top: 36, bottom: 40 },
+        xAxis: {
+          type: 'category',
+          data: stats.map((s) => s.name),
+          axisLabel: { rotate: 15 },
+        },
+        yAxis: [
+          { type: 'value', name: 'profit_usdt', position: 'left' },
+          { type: 'value', name: 'count', position: 'right' },
+        ],
+        series: [
+          { name: 'Total Profit', type: 'bar', data: stats.map((s) => s.totalProfit), itemStyle: { color: '#238636' } },
+          { name: 'Avg Profit', type: 'bar', data: stats.map((s) => s.avgProfit), itemStyle: { color: '#e3b341' } },
+          { name: 'Opp Count', type: 'line', yAxisIndex: 1, smooth: true, data: stats.map((s) => s.count), itemStyle: { color: '#58a6ff' } },
+        ],
+      });
+    }
+  }
+
+  // 2) 路径占比（Buy → Sell）
+  pathSharePieChart = ensureChart(pathSharePieRef.value, pathSharePieChart);
+  if (pathSharePieChart) {
+    if (!opportunities.value.length) {
+      pathSharePieChart.clear();
+      return;
+    }
+
+    const counts = new Map<string, number>();
+    for (const o of opportunities.value) {
+      const key = `${o.buy_platform} → ${o.sell_platform}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const data = Array.from(counts.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => (b.value as number) - (a.value as number));
+
+    pathSharePieChart.setOption({
+      tooltip: { trigger: 'item' },
+      toolbox: { feature: { saveAsImage: {} } },
+      series: [
+        {
+          type: 'pie',
+          radius: ['38%', '70%'],
+          avoidLabelOverlap: true,
+          label: { formatter: '{b}\n{d}%' },
+          data,
+        },
+      ],
+    });
+  }
+};
+
+const handleResize = () => {
+  [
+    profitHistChart,
+    profitRiskChart,
+    profitTimeChart,
+    batchProfitCompareChart,
+    batchRiskCompareChart,
+    batchExperimentCompareChart,
+    pathSharePieChart,
+    riskGaugeChart,
+    riskRadarChart,
+    miniPriceChart,
+  ].forEach((c) => c?.resize());
 };
 
 const openDetails = (record: Opportunity) => {
@@ -1304,17 +1456,21 @@ watch(
     nextTick(() => {
       renderOverviewCharts();
       renderBatchCompareCharts();
+      renderBatchAnalysisCharts();
     });
   },
   { deep: true },
 );
 
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize);
   profitHistChart?.dispose();
   profitRiskChart?.dispose();
   profitTimeChart?.dispose();
   batchProfitCompareChart?.dispose();
   batchRiskCompareChart?.dispose();
+  batchExperimentCompareChart?.dispose();
+  pathSharePieChart?.dispose();
   disposeDetailCharts();
 });
 
@@ -1498,6 +1654,7 @@ const handleRefreshAll = async () => {
 };
 
 onMounted(() => {
+  window.addEventListener('resize', handleResize);
   fetchBatches().then(() => {
     if (reportForm.batch_id) {
       fetchReports(reportForm.batch_id);

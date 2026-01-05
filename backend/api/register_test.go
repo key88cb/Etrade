@@ -49,6 +49,7 @@ func TestBatchHandlerRegisterRoutes(t *testing.T) {
 	assertRouteRegistered(t, router, http.MethodPost, "/api/v1/batches")
 	assertRouteRegistered(t, router, http.MethodGet, "/api/v1/batches/:id")
 	assertRouteRegistered(t, router, http.MethodPut, "/api/v1/batches/:id")
+	assertRouteRegistered(t, router, http.MethodDelete, "/api/v1/batches/:id")
 }
 
 func TestTaskHandlerRegisterRoutes(t *testing.T) {

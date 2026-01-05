@@ -22,6 +22,8 @@ interface OpportunitiesParams {
   limit?: number;
   sort_by?: string;
   order?: 'asc' | 'desc';
+  batch_id?: number;
+  batch_ids?: string;
   startTime?: number;
   endTime?: number;
   taskId?: string | number;
@@ -88,6 +90,7 @@ const api = {
   getBatches: () => instance.get('/batches'),
   createBatch: (payload: BatchPayload) => instance.post('/batches', payload),
   updateBatch: (id: number, payload: BatchPayload) => instance.put(`/batches/${id}`, payload),
+  deleteBatch: (id: number) => instance.delete(`/batches/${id}`),
   getReports: (params?: { batch_id?: number }) => instance.get('/reports', { params }),
   createReport: (payload: ReportPayload) => instance.post('/reports', payload),
   

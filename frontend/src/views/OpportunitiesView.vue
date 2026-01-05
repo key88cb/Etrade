@@ -75,7 +75,7 @@
           </a-card>
 
           <a-card title="快速生成报告" size="small" class="side-card mt-4">
-            <a-form layout="vertical" @finish="submitReport">
+            <a-form layout="vertical">
               <a-form-item label="批次 ID" required>
                 <a-input-number
                   v-model:value="reportForm.batch_id"
@@ -94,7 +94,7 @@
                   <a-select-option value="Markdown">Markdown</a-select-option>
                 </a-select>
               </a-form-item>
-              <a-button type="primary" html-type="submit" block :loading="reportLoading">
+              <a-button type="primary" block :loading="reportLoading" @click="submitReport">
                 提交报告任务
               </a-button>
             </a-form>
@@ -111,7 +111,7 @@
               class="mb-3"
             />
 
-            <a-form layout="vertical" @finish="createExperiment">
+            <a-form layout="vertical">
               <a-form-item label="批次 ID" required>
                 <a-input-number
                   v-model:value="experimentForm.batch_id"
@@ -123,7 +123,7 @@
               <a-form-item label="实验描述（可选）">
                 <a-input v-model:value="experimentForm.description" placeholder="例如：delay=15s, threshold=0.5" />
               </a-form-item>
-              <a-button type="primary" html-type="submit" block :loading="experimentsLoading">
+              <a-button type="primary" block :loading="experimentsLoading" @click="createExperiment">
                 新建实验
               </a-button>
             </a-form>
@@ -168,7 +168,7 @@
 
             <div class="mt-4" v-if="selectedExperimentId">
               <div class="text-xs text-gray-500 mb-2">在当前实验中运行分析模板</div>
-              <a-form layout="vertical" @finish="runSelectedExperiment">
+              <a-form layout="vertical">
                 <a-form-item label="Analyse 模板" required>
                   <a-select
                     v-model:value="experimentRunForm.template_id"
@@ -184,7 +184,7 @@
                     placeholder='例如：{ "overwrite": false, "strategy": { "profit_threshold": 1, "time_delay_seconds": 15 } }'
                   />
                 </a-form-item>
-                <a-button type="primary" html-type="submit" block :loading="runLoading" :disabled="!experimentRunForm.template_id">
+                <a-button type="primary" block :loading="runLoading" :disabled="!experimentRunForm.template_id" @click="runSelectedExperiment">
                   运行实验
                 </a-button>
               </a-form>
@@ -489,7 +489,7 @@
           <div ref="miniPriceRef" style="height: 260px;"></div>
         </a-card>
 
-        <a-card size="small" :bordered="false" class="mt-4 bg-gray-50">
+        <a-card size="small" :bordered="false" class="mt-4 ai-card">
           <template #title>
              <div class="flex items-center gap-2">
                 <RobotOutlined class="text-blue-500" />
@@ -512,25 +512,25 @@
           
           <div v-if="selectedOpp?.llm_analysis" class="py-2">
             <div class="flex items-center gap-3 mb-3">
-              <span class="text-gray-500 text-sm">风险等级:</span>
+              <span class="ai-muted text-sm">风险等级:</span>
               <a-tag :color="getRiskLevelColor(selectedOpp.llm_analysis.risk_level)" class="px-3 py-0.5 text-sm font-medium rounded-full">
                 {{ selectedOpp.llm_analysis.risk_level }}
               </a-tag>
             </div>
             
-            <div class="mb-4 text-gray-700 bg-white p-4 rounded-lg border border-gray-100 shadow-sm leading-relaxed">
+            <div class="mb-4 ai-summary p-4 rounded-lg leading-relaxed">
               {{ selectedOpp.llm_analysis.summary }}
             </div>
 
-            <div v-if="selectedOpp.llm_analysis.warning" class="mb-4 bg-red-50 p-3 rounded-lg border border-red-100 flex items-start gap-2 text-red-700">
+            <div v-if="selectedOpp.llm_analysis.warning" class="mb-4 ai-warning p-3 rounded-lg flex items-start gap-2">
               <AlertOutlined class="mt-1" />
               <span class="text-sm font-medium">{{ selectedOpp.llm_analysis.warning }}</span>
             </div>
 
             <div v-if="selectedOpp.llm_analysis.suggestions && selectedOpp.llm_analysis.suggestions.length">
-              <div class="text-sm font-semibold text-gray-800 mb-2">操作建议:</div>
+              <div class="text-sm font-semibold ai-text mb-2">操作建议:</div>
               <ul class="list-none space-y-1.5 pl-0">
-                <li v-for="(s, i) in selectedOpp.llm_analysis.suggestions" :key="i" class="flex items-start gap-2 text-sm text-gray-600">
+                <li v-for="(s, i) in selectedOpp.llm_analysis.suggestions" :key="i" class="flex items-start gap-2 text-sm ai-muted">
                    <span class="text-blue-400 mt-1">•</span>
                    <span>{{ s }}</span>
                 </li>
@@ -538,8 +538,8 @@
             </div>
           </div>
           
-          <div v-else class="flex flex-col items-center justify-center py-10 text-gray-400">
-            <RobotOutlined class="text-4xl mb-3 text-gray-300" />
+          <div v-else class="flex flex-col items-center justify-center py-10 ai-muted">
+            <RobotOutlined class="text-4xl mb-3 ai-muted" />
             <div class="text-sm">点击右上角按钮获取 AI 深度风险评估</div>
           </div>
         </a-card>
@@ -1429,6 +1429,88 @@ const renderDetailCharts = async () => {
         miniPriceChart?.resize();
         return;
       }
+
+      const buyTime = bt;
+      const sellTime = bt + 12 * 1000;
+
+      const pickSeriesKey = (platform?: string) => {
+        const p = String(platform ?? '').toLowerCase();
+        if (p.includes('binance')) return 'binance';
+        if (p.includes('uniswap') || p.includes('uni')) return 'uniswap';
+        return 'unknown';
+      };
+
+      const nearestPoint = (series: Array<[number, number]>, targetTime: number) => {
+        let best: [number, number] | null = null;
+        let bestDist = Number.POSITIVE_INFINITY;
+        for (const pt of series) {
+          const t = Number(pt?.[0]);
+          const y = Number(pt?.[1]);
+          if (!Number.isFinite(t) || !Number.isFinite(y)) continue;
+          const dist = Math.abs(t - targetTime);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = [t, y];
+          }
+        }
+        return best;
+      };
+
+      const isDarkTheme = document.documentElement.classList.contains('dark');
+      const labelBg = isDarkTheme ? '#0d1117' : '#ffffff';
+      const labelText = isDarkTheme ? '#e6edf3' : '#24292f';
+      const labelBorder = isDarkTheme ? '#30363d' : '#d0d7de';
+
+      const buyKey = pickSeriesKey(selectedOpp.value.buy_platform);
+      const sellKey = pickSeriesKey(selectedOpp.value.sell_platform);
+
+      const buyOnBinance = buyKey === 'binance' || (buyKey === 'unknown' && binance.length && !uniswap.length);
+      const sellOnBinance = sellKey === 'binance' || (sellKey === 'unknown' && binance.length && !uniswap.length);
+
+      const buySeries = buyOnBinance ? binance : uniswap;
+      const sellSeries = sellOnBinance ? binance : uniswap;
+
+      const buyCoord = nearestPoint(buySeries, buyTime);
+      const sellCoord = nearestPoint(sellSeries, sellTime);
+
+      const buyMark = (coord: [number, number]) => ({
+        name: 'BUY',
+        coord,
+        itemStyle: { color: '#3fb950', borderColor: labelBg, borderWidth: 2 },
+        label: {
+          show: true,
+          position: 'bottom',
+          formatter: () => `BUY\n${selectedOpp.value?.buy_platform ?? ''}`,
+          backgroundColor: labelBg,
+          borderColor: '#3fb950',
+          borderWidth: 1,
+          borderRadius: 4,
+          padding: [4, 6],
+          color: labelText,
+        },
+      });
+
+      const sellMark = (coord: [number, number]) => ({
+        name: 'SELL',
+        coord,
+        itemStyle: { color: '#f85149', borderColor: labelBg, borderWidth: 2 },
+        label: {
+          show: true,
+          position: 'top',
+          formatter: () => `SELL\n${selectedOpp.value?.sell_platform ?? ''}`,
+          backgroundColor: labelBg,
+          borderColor: '#f85149',
+          borderWidth: 1,
+          borderRadius: 4,
+          padding: [4, 6],
+          color: labelText,
+        },
+      });
+
+      const uniswapMarks: any[] = [];
+      const binanceMarks: any[] = [];
+      if (buyCoord) (buyOnBinance ? binanceMarks : uniswapMarks).push(buyMark(buyCoord));
+      if (sellCoord) (sellOnBinance ? binanceMarks : uniswapMarks).push(sellMark(sellCoord));
       miniPriceChart?.setOption({
         tooltip: { trigger: 'axis' },
         legend: { top: 0, data: ['Uniswap', 'Binance'] },
@@ -1437,8 +1519,35 @@ const renderDetailCharts = async () => {
         yAxis: { type: 'value', scale: true },
         dataZoom: [{ type: 'inside' }],
         series: [
-          { name: 'Uniswap', type: 'line', showSymbol: false, data: uniswap, lineStyle: { width: 1.5 } },
-          { name: 'Binance', type: 'line', showSymbol: false, data: binance, lineStyle: { width: 1.5 } },
+          {
+            name: 'Uniswap',
+            type: 'line',
+            showSymbol: false,
+            data: uniswap,
+            lineStyle: { width: 1.5 },
+            markPoint: uniswapMarks.length
+              ? { symbol: 'circle', symbolSize: 12, data: uniswapMarks }
+              : undefined,
+            markLine:
+              buyCoord && sellCoord
+                ? {
+                    silent: true,
+                    symbol: 'none',
+                    lineStyle: { type: 'dashed', opacity: 0.6, color: labelBorder },
+                    data: [[{ coord: buyCoord }, { coord: sellCoord }]] as any,
+                  }
+                : undefined,
+          },
+          {
+            name: 'Binance',
+            type: 'line',
+            showSymbol: false,
+            data: binance,
+            lineStyle: { width: 1.5 },
+            markPoint: binanceMarks.length
+              ? { symbol: 'circle', symbolSize: 12, data: binanceMarks }
+              : undefined,
+          },
         ],
       });
       miniPriceChart?.resize();
@@ -1523,7 +1632,11 @@ const fetchTemplates = async () => {
 
 const refreshExperiments = async () => {
   const batchId = experimentForm.batch_id ?? reportForm.batch_id ?? lastOpenedBatchId.value;
-  if (!batchId) return;
+  if (!batchId) {
+    experimentError.value = '请先选择批次 ID';
+    message.warning('请先选择批次 ID，再刷新实验列表');
+    return;
+  }
   experimentsLoading.value = true;
   experimentError.value = '';
   try {
@@ -1627,6 +1740,7 @@ const goTasks = () => {
 const submitReport = async () => {
   if (!reportForm.batch_id) {
     error.value = '请先选择批次';
+    message.warning('请先输入批次 ID');
     return;
   }
   reportLoading.value = true;
@@ -1637,8 +1751,10 @@ const submitReport = async () => {
       format: reportForm.format,
     });
     await fetchReports(reportForm.batch_id);
+    message.success('报告任务已提交（生成可能需要一点时间）');
   } catch (err: any) {
     error.value = err?.message ?? '生成报告失败';
+    message.error(error.value);
   } finally {
     reportLoading.value = false;
   }
@@ -1697,6 +1813,7 @@ watch(
   --gh-border: #d0d7de;
   --gh-muted: #57606a;
   --gh-accent: #0969da;
+  --gh-text: #24292f;
   --gh-selected: #ddf4ff;
   --gh-hover: #f6f8fa;
   --gh-table-head: #f6f8fa;
@@ -1708,6 +1825,7 @@ watch(
   --gh-border: #30363d;
   --gh-muted: #7d8590;
   --gh-accent: #58a6ff;
+  --gh-text: #e6edf3;
   --gh-selected: rgba(31, 111, 235, 0.15);
   --gh-hover: #161b22;
   --gh-table-head: #0d1117;
@@ -1759,6 +1877,53 @@ watch(
 .batch-list {
   max-height: 360px;
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gh-border) var(--gh-surface);
+}
+
+.batch-list::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.batch-list::-webkit-scrollbar-track {
+  background: var(--gh-surface);
+}
+
+.batch-list::-webkit-scrollbar-thumb {
+  background: var(--gh-border);
+  border-radius: 10px;
+  border: 2px solid var(--gh-surface);
+}
+
+.batch-list::-webkit-scrollbar-thumb:hover {
+  background: var(--gh-muted);
+}
+
+.ai-card {
+  background: var(--gh-hover);
+  border: 1px solid var(--gh-border);
+}
+
+.ai-summary {
+  background: var(--gh-surface);
+  border: 1px solid var(--gh-border);
+  color: var(--gh-text);
+}
+
+.ai-warning {
+  background: rgba(248, 81, 73, 0.12);
+  border: 1px solid rgba(248, 81, 73, 0.25);
+  color: #f85149;
+}
+
+.ai-muted {
+  color: var(--gh-muted);
+}
+
+.ai-text {
+  color: var(--gh-text);
 }
 
 .batch-item {

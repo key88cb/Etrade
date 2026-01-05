@@ -171,7 +171,11 @@ const secondaryButtonClass = computed(() =>
             borderClass,
             isDark ? 'bg-[#0d1117]' : 'bg-white',
           ]"
-          style="height: 56px; line-height: 56px"
+          :style="{
+            height: '56px',
+            lineHeight: '56px',
+            background: isDark ? '#0d1117' : '#ffffff',
+          }"
         >
           <div class="text-sm" :class="headerSubtleClass"></div>
           <div class="flex items-center gap-3">

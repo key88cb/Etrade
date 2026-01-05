@@ -130,10 +130,10 @@ const templateConfigs = reactive<TemplateConfigs>({
 });
 
 const tasks = ref<Task[]>([
-  { id: 'collect-binance', taskType: 'collect_binance', name: 'Binance Import', description: 'Import historical data', icon: 'download', status: 'idle' },
-  { id: 'collect-uniswap', taskType: 'collect_uniswap', name: 'Uniswap Fetch', description: 'Fetch on-chain data', icon: 'download', status: 'idle' },
-  { id: 'process-prices', taskType: 'process_prices', name: 'Price Aggregation', description: 'Aggregate raw market data', icon: 'database', status: 'idle' },
-  { id: 'analyse', taskType: 'analyse', name: 'Arbitrage Analysis', description: 'Detect arbitrage windows', icon: 'trending', status: 'idle' },
+  { id: 'collect-binance', taskType: 'collect_binance', name: '导入 Binance 数据', description: '从 CSV 导入币安历史成交数据', icon: 'download', status: 'idle' },
+  { id: 'collect-uniswap', taskType: 'collect_uniswap', name: '抓取 Uniswap 数据', description: '从 The Graph 拉取链上交易数据', icon: 'download', status: 'idle' },
+  { id: 'process-prices', taskType: 'process_prices', name: '价格聚合', description: '将原始数据聚合为可查询的价格序列', icon: 'database', status: 'idle' },
+  { id: 'analyse', taskType: 'analyse', name: '套利分析', description: '在历史窗口中识别潜在套利机会', icon: 'trending', status: 'idle' },
 ]);
 
 const latestRangeOptions = [
@@ -154,12 +154,12 @@ const lightInputClass = 'bg-[#f6f8fa] border-[#d0d7de] text-[#24292f] focus:ring
 const iconMap: Record<TaskIcon, any> = { download: Download, database: Database, trending: TrendingUp };
 
 const statusLabel = (status: string) => {
-  if (!status) return 'Unknown';
+  if (!status) return '未知';
   switch (status.toUpperCase()) {
-    case 'RUNNING': case 'GENERATING': return 'Running';
-    case 'SUCCESS': return 'Success';
-    case 'ERROR': case 'FAILED': return 'Error';
-    case 'PENDING': return 'Pending';
+    case 'RUNNING': case 'GENERATING': return '运行中';
+    case 'SUCCESS': return '成功';
+    case 'ERROR': case 'FAILED': return '失败';
+    case 'PENDING': return '等待中';
     default: return status;
   }
 };
@@ -507,7 +507,7 @@ const fetchReports = async () => {
 
 const handleCreateReport = async () => {
   if (!reportForm.batch_id) {
-    alert('Please select a batch.');
+    alert('请先选择批次');
     return;
   }
   isGeneratingReport.value = true;
@@ -541,12 +541,12 @@ const handleCreateReport = async () => {
 };
 
 const handleDeleteReport = async (id: number) => {
-  if (!confirm('Are you sure you want to delete this report?')) return;
+  if (!confirm('确定删除该报告吗？')) return;
   try {
     await api.deleteReport(id);
     reports.value = reports.value.filter(r => r.id !== id);
   } catch (e: any) {
-    alert('Failed to delete report: ' + e.message);
+    alert('删除报告失败：' + e.message);
   }
 };
 
@@ -615,7 +615,7 @@ const runPipelineTask = async (taskType: PipelineTaskType) => {
   try {
     const overrides = buildOverrides(taskType);
     await api.runTemplate(template.id, { overrides });
-    updateTaskState(taskType, { status: 'success', lastRun: new Date().toLocaleString('en-US') });
+    updateTaskState(taskType, { status: 'success', lastRun: new Date().toLocaleString('zh-CN', { hour12: false }) });
     await fetchControlData();
   } catch (error: any) {
     updateTaskState(taskType, { status: 'error' });
@@ -701,7 +701,7 @@ onMounted(fetchAllData);
               :class="isDark ? 'border-[#30363d] hover:bg-[#0d1117]' : 'border-[#d0d7de] hover:bg-[#f6f8fa]'"
             >
               <td class="py-2 px-3 font-mono text-xs" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">#{{ report.id }}</td>
-              <td class="py-2 px-3" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">Batch #{{ report.batch_id }}</td>
+              <td class="py-2 px-3" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">批次 #{{ report.batch_id }}</td>
               <td class="py-2 px-3"><span class="px-1.5 py-0.5 rounded text-[10px] border font-medium uppercase">{{ report.format }}</span></td>
               <td class="py-2 px-3 text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">{{ formatTime(report.created_at) }}</td>
               <td class="py-2 px-3">
@@ -716,14 +716,14 @@ onMounted(fetchAllData);
                   type="button"
                   @click="downloadReport(report.id)"
                   class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-blue-500 transition-colors"
-                  title="Download"
+                  title="下载"
                 >
                   <FileDown class="w-4 h-4" />
                 </button>
                 <button 
                   @click="handleDeleteReport(report.id)"
                   class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-red-500 transition-colors"
-                  title="Delete"
+                  title="删除"
                 >
                   <Trash2 class="w-4 h-4" />
                 </button>
@@ -738,7 +738,7 @@ onMounted(fetchAllData);
       <div class="flex items-center justify-between gap-3">
         <div class="flex items-center gap-2">
           <Play class="w-4 h-4" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'" />
-          <h2 :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">Pipeline Control</h2>
+          <h2 :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">任务流水线</h2>
         </div>
         <div class="flex items-center gap-2">
           <select
@@ -776,7 +776,7 @@ onMounted(fetchAllData);
             </div>
             <div class="flex items-center gap-2">
               <button v-if="!templateByType[task.taskType]" class="px-2 py-1 text-xs rounded border transition-colors" :class="isDark ? 'border-[#30363d] text-[#7d8590]' : 'border-[#d0d7de] text-[#57606a]'" @click="createTemplateForTask(task.taskType)">{{ creatingTemplateType === task.taskType ? '创建中…' : '创建模板' }}</button>
-              <button class="px-3 py-1.5 bg-[#238636] text-white rounded text-sm hover:bg-[#2ea043]" :disabled="task.status === 'running'" @click="runPipelineTask(task.taskType)">Run</button>
+              <button class="px-3 py-1.5 bg-[#238636] text-white rounded text-sm hover:bg-[#2ea043]" :disabled="task.status === 'running'" @click="runPipelineTask(task.taskType)">运行</button>
             </div>
           </div>
           
@@ -811,15 +811,15 @@ onMounted(fetchAllData);
                   </label>
                   <div class="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3 border-t pt-2 mt-2" :class="isDark ? 'border-[#30363d]' : 'border-[#d0d7de]'">
                     <label :class="[labelTextClass, 'flex flex-col gap-1']">
-                      <span>Profit Threshold (USDT)</span>
+                      <span>利润阈值（USDT）</span>
                       <input type="number" v-model.number="templateConfigs.analyse.strategy.profit_threshold" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />
                     </label>
                     <label :class="[labelTextClass, 'flex flex-col gap-1']">
-                      <span>Time Delay (s)</span>
+                      <span>延迟（秒）</span>
                       <input type="number" v-model.number="templateConfigs.analyse.strategy.time_delay_seconds" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />
                     </label>
                     <label :class="[labelTextClass, 'flex flex-col gap-1']">
-                      <span>Initial Investment (USDT)</span>
+                      <span>初始资金（USDT）</span>
                       <input type="number" v-model.number="templateConfigs.analyse.strategy.initial_investment" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />
                     </label>
                   </div>
@@ -833,16 +833,16 @@ onMounted(fetchAllData);
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div class="rounded-md border p-4 space-y-3" :class="isDark ? 'bg-[#161b22] border-[#30363d]' : 'bg-white border-[#d0d7de]'">
         <div class="flex items-center justify-between">
-          <h3 :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">Template Actions</h3>
-          <button class="text-xs" :class="isDark ? 'text-[#58a6ff]' : 'text-[#0969da]'" @click="reloadControlData">Reload</button>
+          <h3 :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">模板操作</h3>
+          <button class="text-xs" :class="isDark ? 'text-[#58a6ff]' : 'text-[#0969da]'" @click="reloadControlData">刷新</button>
         </div>
         <div v-if="templates.length === 0" class="text-xs" :class="isDark ? 'text-[#7d8590]' : 'text-[#57606a]'">暂无模板。</div>
         <div v-for="template in templates.slice(0, 3)" :key="template.id" class="border rounded px-3 py-2 space-y-1" :class="isDark ? 'border-[#30363d]' : 'border-[#d0d7de]'">
           <div class="flex items-center justify-between">
             <div class="text-sm font-medium" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">{{ template.name }}</div>
             <div class="flex gap-2">
-              <button class="text-xs text-red-500 hover:underline" @click="handleDeleteTemplate(template.id)">Delete</button>
-              <button class="text-xs text-green-500 hover:underline" @click="runTemplateQuick(template.id)">Run</button>
+              <button class="text-xs text-red-500 hover:underline" @click="handleDeleteTemplate(template.id)">删除</button>
+              <button class="text-xs text-green-500 hover:underline" @click="runTemplateQuick(template.id)">运行</button>
             </div>
           </div>
         </div>
@@ -850,12 +850,12 @@ onMounted(fetchAllData);
 
       <div class="rounded-md border p-4 space-y-3" :class="isDark ? 'bg-[#161b22] border-[#30363d]' : 'bg-white border-[#d0d7de]'">
         <div class="flex items-center justify-between">
-          <h3 :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">Legacy Quick Report</h3>
+          <h3 :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">快速生成报告（兼容入口）</h3>
         </div>
         <div class="grid grid-cols-1 gap-2 text-xs">
-          <input v-model="legacyReportForm.batch_id" type="number" placeholder="Batch ID" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />
+          <input v-model="legacyReportForm.batch_id" type="number" placeholder="批次 ID" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]" />
           <button class="w-full px-3 py-1.5 bg-[#238636] text-white text-xs rounded disabled:opacity-60" :disabled="legacyReportLoading" @click="submitLegacyReport">
-            {{ legacyReportLoading ? 'Submitting...' : 'Submit' }}
+            {{ legacyReportLoading ? '提交中…' : '提交' }}
           </button>
         </div>
       </div>
@@ -864,26 +864,26 @@ onMounted(fetchAllData);
     <div v-if="showReportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div class="w-full max-w-md rounded-lg shadow-xl overflow-hidden animate-in zoom-in duration-200" :class="isDark ? 'bg-[#161b22] border border-[#30363d]' : 'bg-white'">
         <div class="px-4 py-3 border-b flex justify-between items-center" :class="isDark ? 'border-[#30363d]' : 'border-gray-200'">
-          <h3 class="font-semibold" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">Generate New Report</h3>
+          <h3 class="font-semibold" :class="isDark ? 'text-[#e6edf3]' : 'text-[#24292f]'">生成新报告</h3>
           <button @click="showReportModal = false"><X class="w-5 h-5 text-gray-500" /></button>
         </div>
         <div class="p-4 space-y-4">
           <div>
-            <label class="block text-xs mb-1" :class="labelTextClass">Select Batch <span class="text-red-500">*</span></label>
+            <label class="block text-xs mb-1" :class="labelTextClass">选择批次 <span class="text-red-500">*</span></label>
             <select v-model="reportForm.batch_id" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]">
-              <option value="" disabled>-- Choose a Batch --</option>
-              <option v-for="b in batches" :key="b.id" :value="b.id">{{ b.name }} (ID: {{ b.id }})</option>
+              <option value="" disabled>-- 请选择批次 --</option>
+              <option v-for="b in batches" :key="b.id" :value="b.id">{{ b.name }}（ID：{{ b.id }}）</option>
             </select>
           </div>
           <div>
-            <label class="block text-xs mb-1" :class="labelTextClass">Report Template</label>
+            <label class="block text-xs mb-1" :class="labelTextClass">报告模板</label>
             <select v-model="reportForm.template_id" :class="[baseInputClass, isDark ? darkInputClass : lightInputClass]">
-              <option value="">Default Template</option>
+              <option value="">默认模板</option>
               <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }}</option>
             </select>
           </div>
           <div>
-            <label class="block text-xs mb-1" :class="labelTextClass">Output Format</label>
+            <label class="block text-xs mb-1" :class="labelTextClass">输出格式</label>
             <div class="flex gap-2">
               <button 
                 v-for="fmt in ['PDF', 'HTML', 'Markdown']" :key="fmt"
@@ -898,14 +898,14 @@ onMounted(fetchAllData);
           </div>
         </div>
         <div class="px-4 py-3 border-t bg-opacity-50 flex justify-end gap-2" :class="isDark ? 'bg-[#0d1117] border-[#30363d]' : 'bg-gray-50 border-gray-200'">
-          <button @click="showReportModal = false" class="px-3 py-1.5 rounded text-xs border text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">Cancel</button>
+          <button @click="showReportModal = false" class="px-3 py-1.5 rounded text-xs border text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">取消</button>
           <button 
             @click="handleCreateReport" 
             :disabled="isGeneratingReport || !reportForm.batch_id"
             class="px-3 py-1.5 rounded text-xs bg-[#238636] text-white hover:bg-[#2ea043] disabled:opacity-50 flex items-center gap-1"
           >
             <Loader2 v-if="isGeneratingReport" class="w-3 h-3 animate-spin" />
-            {{ isGeneratingReport ? 'Generating...' : 'Generate' }}
+            {{ isGeneratingReport ? '生成中…' : '生成' }}
           </button>
         </div>
       </div>

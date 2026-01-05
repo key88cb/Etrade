@@ -248,27 +248,28 @@ def save_results(
     experiment_id: Optional[int] = None,
 ) -> None:
     with conn.cursor() as cur:
+        # ⚠️ overwrite 只能覆盖当前 batch_id 的数据：不能 DROP 整张表，否则会清空其他批次的机会记录。
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS arbitrage_opportunities (
+                id SERIAL PRIMARY KEY,
+                batch_id integer,
+                buy_platform text,
+                sell_platform text,
+                buy_price numeric,
+                sell_price numeric,
+                profit_usdt numeric,
+                details_json jsonb,
+                risk_metrics_json jsonb
+            );
+            """
+        )
         if overwrite:
-            logger.info("正在重建 arbitrage_opportunities 表...")
-            cur.execute("DROP TABLE IF EXISTS arbitrage_opportunities;")
+            logger.info("overwrite=True：清空当前 batch_id=%s 的历史机会记录", batch_id)
             cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS arbitrage_opportunities (
-                    id SERIAL PRIMARY KEY,
-                    batch_id integer,
-                    buy_platform text,
-                    sell_platform text,
-                    buy_price numeric,
-                    sell_price numeric,
-                    profit_usdt numeric,
-                    details_json jsonb,
-                    risk_metrics_json jsonb
-                );
-                """
+                "DELETE FROM arbitrage_opportunities WHERE batch_id = %s;",
+                (batch_id,),
             )
-        else:
-            # overwrite=False 时追加数据，不删除旧数据
-            pass
 
         if not results:
             conn.commit()

@@ -59,7 +59,7 @@ const router = createRouter({
         {
           path: 'overview',
           name: 'Overview',
-          meta: { title: '概览' },
+          meta: { title: '运行任务' },
           component: () => import('../views/Home.vue'),
         },
       ],

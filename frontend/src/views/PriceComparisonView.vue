@@ -54,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onBeforeUnmount } from 'vue';
+import { ref, onBeforeUnmount, onMounted } from 'vue';
 import api from '../api'; // 确保这个路径指向你导出的api实例
 import * as echarts from 'echarts/core';
 import type { EChartsCoreOption, EChartsType } from 'echarts/core';
@@ -100,10 +100,10 @@ const error = ref<string | null>(null);
 const chartOption = ref<EChartsCoreOption | null>(null); // 用于存储图表配置
 
 // --- 日期范围选择 ---
-// 设置默认日期范围为过去 7 天
-const defaultEndDate = dayjs().utc(); // 使用 UTC 时间
-const defaultStartDate = defaultEndDate.subtract(7, 'day');
-const selectedDateRange = ref<[Dayjs, Dayjs]>([defaultStartDate, defaultStartDate]); // 使用 ref 存储日期范围
+// 预设：2025-09-01 ~ 2025-09-30（UTC）
+const presetStartDate = dayjs.utc('2025-09-01');
+const presetEndDate = dayjs.utc('2025-09-30');
+const selectedDateRange = ref<[Dayjs, Dayjs]>([presetStartDate, presetEndDate]);
 
 // --- 后端返回的数据结构 ---
 interface PriceData {
@@ -253,10 +253,10 @@ const resizeChart = () => {
 };
 
 // --- Vue 生命周期钩子 ---
-// 可以在 onMounted 中加载默认范围的数据
-// onMounted(() => {
-//   fetchChartData();
-// });
+// 进入页面后自动加载预设范围的数据（仍可手动调整范围后再次点击按钮）
+onMounted(() => {
+  fetchChartData();
+});
 
 onBeforeUnmount(() => {
   // 销毁图表实例和事件监听

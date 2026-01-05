@@ -394,7 +394,7 @@ onBeforeUnmount(() => {
 
     <div class="bg-white dark:bg-[#161b22] rounded-lg shadow border border-[#d0d7de] dark:border-[#30363d] p-4">
       <div class="flex items-center justify-between mb-2">
-        <div class="text-sm font-medium text-[#24292f] dark:text-[#e6edf3]">类型分布（Pie）</div>
+        <div class="text-sm font-medium text-[#24292f] dark:text-[#e6edf3]">类型分布</div>
         <button
           type="button"
           class="text-sm text-blue-600 hover:underline"
